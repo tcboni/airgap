@@ -1,0 +1,1776 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>AIRGAP · ACOUSTIC DATA COUPLER MK-1</title>
+<style>
+/* ---- AIRGAP MK-1 · cassette-futurism control panel ---- */
+:root {
+  --bg: #0a0c0a;
+  --panel: #12150f;
+  --panel-2: #0e110c;
+  --seam: #262b22;
+  --seam-hi: #3a4234;
+  --ink: #cfc8b0;
+  --dim: #7a7666;
+  --faint: #4a483d;
+  --amber: #ffb020;
+  --amber-dim: #8a6318;
+  --green: #5cf08c;
+  --green-dim: #2e7247;
+  --red: #ff5040;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  background:
+    radial-gradient(1200px 600px at 50% -10%, #151a12 0%, var(--bg) 60%),
+    var(--bg);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 14px;
+  line-height: 1.45;
+  min-height: 100vh;
+  padding: 14px 10px 60px;
+}
+/* CRT scanlines + vignette, very subtle */
+body::before {
+  content: ""; position: fixed; inset: 0; z-index: 40; pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgba(0,0,0,.16) 0 1px, transparent 1px 3px);
+  mix-blend-mode: multiply;
+}
+body::after {
+  content: ""; position: fixed; inset: 0; z-index: 41; pointer-events: none;
+  background: radial-gradient(120% 100% at 50% 40%, transparent 60%, rgba(0,0,0,.5) 100%);
+}
+.chassis { max-width: 780px; margin: 0 auto; }
+
+/* ---- panels ---- */
+.panel {
+  position: relative;
+  background: linear-gradient(175deg, var(--panel) 0%, var(--panel-2) 100%);
+  border: 1px solid var(--seam);
+  border-top-color: var(--seam-hi);
+  border-radius: 6px;
+  box-shadow: 0 3px 0 #000, 0 10px 24px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.04);
+  padding: 18px 16px 16px;
+  margin-bottom: 14px;
+}
+.panel .screw { position: absolute; width: 9px; height: 9px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #555c50, #191c17 70%);
+  box-shadow: inset 0 0 2px #000, 0 1px 0 rgba(255,255,255,.06); }
+.panel .screw::after { content:""; position:absolute; left:1px; right:1px; top:4px; height:1px; background:#0a0b09; transform: rotate(37deg); }
+.screw.tl{top:6px;left:6px} .screw.tr{top:6px;right:6px} .screw.bl{bottom:6px;left:6px} .screw.br{bottom:6px;right:6px}
+
+.plabel {
+  display:flex; align-items: baseline; gap:10px;
+  font-size: 10px; letter-spacing: .22em; color: var(--dim);
+  border-bottom: 1px solid var(--seam); padding-bottom: 8px; margin-bottom: 14px;
+}
+.plabel b { color: var(--ink); font-weight: 400; }
+.plabel .tag { margin-left:auto; color: var(--faint); letter-spacing:.12em; }
+
+/* ---- header ---- */
+header.panel { display: grid; grid-template-columns: 64px 1fr 64px; gap: 14px; align-items: center; padding: 16px; }
+.grille { width: 64px; height: 64px; border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, transparent 0, transparent 100%),
+    radial-gradient(#000 1.4px, transparent 1.6px) 0 0/6px 6px,
+    radial-gradient(circle at 40% 35%, #20251d, #0c0e0a 75%);
+  border: 2px solid #232820; box-shadow: inset 0 2px 8px #000, 0 1px 0 rgba(255,255,255,.05);
+}
+.masthead { text-align: center; }
+.masthead h1 {
+  font-size: clamp(26px, 7vw, 40px); font-weight: 700; letter-spacing: .34em; text-indent:.34em;
+  color: var(--ink); text-shadow: 0 0 18px rgba(255,176,32,.25);
+}
+.masthead h1 .gap { color: var(--amber); }
+.masthead .sub { font-size: 10px; letter-spacing: .3em; color: var(--dim); margin-top: 4px; }
+.masthead .sub em { font-style: normal; color: var(--amber-dim); }
+
+/* ---- controls ---- */
+button {
+  font-family: var(--mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--ink); background: linear-gradient(180deg, #1c211a, #14180f);
+  border: 1px solid #363d31; border-bottom-color:#20251c; border-radius: 4px;
+  padding: 9px 14px; cursor: pointer;
+  box-shadow: 0 2px 0 #000, inset 0 1px 0 rgba(255,255,255,.06);
+}
+button:hover { border-color: #4a5443; }
+button:active { transform: translateY(1px); box-shadow: 0 1px 0 #000, inset 0 1px 0 rgba(255,255,255,.04); }
+button:disabled { opacity:.4; cursor: default; transform:none; }
+button.big { width: 100%; padding: 15px 14px; font-size: 14px; letter-spacing:.22em; }
+button.arm { color: var(--amber); border-color: #6b5417; text-shadow: 0 0 10px rgba(255,176,32,.5); }
+button.arm:hover { border-color: var(--amber); box-shadow: 0 2px 0 #000, 0 0 16px rgba(255,176,32,.15), inset 0 1px 0 rgba(255,255,255,.06); }
+button.hot { color: var(--green); border-color: #2e7247; text-shadow: 0 0 10px rgba(92,240,140,.5); }
+button.hot:hover { border-color: var(--green); box-shadow: 0 2px 0 #000, 0 0 16px rgba(92,240,140,.15), inset 0 1px 0 rgba(255,255,255,.06); }
+button.danger { color: var(--red); border-color: #7a2a24; }
+
+/* mode rocker */
+.rocker { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1px solid var(--seam-hi); border-radius: 6px; overflow: hidden;
+  box-shadow: 0 3px 0 #000, inset 0 1px 0 rgba(255,255,255,.04); margin-bottom: 14px; }
+.rocker button { border: 0; border-radius: 0; box-shadow: none; padding: 14px 8px; font-size: 13px; letter-spacing:.26em; background: #101309; background: linear-gradient(180deg,#171b14,#101309); color: var(--dim); }
+.rocker button + button { border-left: 1px solid var(--seam-hi); }
+.rocker button.sel-tx { background: linear-gradient(180deg, #2b2107, #1d1605); color: var(--amber); text-shadow: 0 0 12px rgba(255,176,32,.6); }
+.rocker button.sel-rx { background: linear-gradient(180deg, #0c2a17, #081d10); color: var(--green); text-shadow: 0 0 12px rgba(92,240,140,.6); }
+
+/* profile switch */
+.profrow { display:flex; align-items:center; gap:10px; justify-content:center; margin-top:10px; font-size:10px; letter-spacing:.18em; color:var(--dim); flex-wrap: wrap;}
+.profsw { display:inline-flex; border:1px solid var(--seam-hi); border-radius:4px; overflow:hidden; }
+.profsw button { border:0; border-radius:0; box-shadow:none; padding:5px 12px; font-size:10px; color:var(--dim); background:#12150e; }
+.profsw button + button { border-left:1px solid var(--seam-hi); }
+.profsw button.sel { color:var(--amber); background:#241c08; }
+
+/* LEDs */
+.ledrow { display: flex; gap: 4%; justify-content: space-between; margin: 4px 0 16px; }
+.led { flex:1; text-align: center; }
+.led i {
+  display: block; width: 12px; height: 12px; margin: 0 auto 6px; border-radius: 50%;
+  background: #1c1f1a; border: 1px solid #000; box-shadow: inset 0 1px 2px #000;
+}
+.led span { font-size: 9px; letter-spacing: .16em; color: var(--faint); }
+.led.on span { color: var(--dim); }
+.led.on.g i { background: var(--green); box-shadow: 0 0 10px var(--green), 0 0 3px var(--green), inset 0 0 3px rgba(255,255,255,.7); }
+.led.on.a i { background: var(--amber); box-shadow: 0 0 10px var(--amber), 0 0 3px var(--amber), inset 0 0 3px rgba(255,255,255,.7); }
+.led.on.r i { background: var(--red); box-shadow: 0 0 10px var(--red), 0 0 3px var(--red), inset 0 0 3px rgba(255,255,255,.7); }
+.led.blink i { animation: blink 1s steps(2) infinite; }
+@keyframes blink { 50% { filter: brightness(.35); } }
+
+/* readouts */
+.readouts { display:flex; gap:10px; flex-wrap:wrap; margin: 12px 0; }
+.ro { flex:1 1 110px; background:#0a0d08; border:1px solid var(--seam); border-radius:4px; padding:8px 10px;
+  box-shadow: inset 0 2px 6px rgba(0,0,0,.7); }
+.ro .k { font-size:9px; letter-spacing:.2em; color:var(--faint); }
+.ro .v { font-size:16px; color:var(--amber); text-shadow:0 0 8px rgba(255,176,32,.35); margin-top:2px; white-space:nowrap; }
+.rx .ro .v { color: var(--green); text-shadow:0 0 8px rgba(92,240,140,.35); }
+
+/* text input */
+textarea {
+  width: 100%; min-height: 110px; resize: vertical;
+  background: #0a0d08; color: var(--ink); border: 1px solid var(--seam); border-radius: 4px;
+  font-family: var(--mono); font-size: 14px; padding: 10px;
+  box-shadow: inset 0 2px 8px rgba(0,0,0,.7); outline: none; caret-color: var(--amber);
+}
+textarea:focus { border-color: var(--amber-dim); }
+.filebar { display:flex; gap:10px; align-items:center; margin-top:10px; flex-wrap:wrap; }
+.filechip { display:none; align-items:center; gap:8px; font-size:11px; color:var(--amber);
+  border:1px dashed var(--amber-dim); border-radius:4px; padding:5px 10px; }
+.filechip.show { display:inline-flex; }
+.filechip button { padding:1px 7px; font-size:11px; }
+input[type=file] { display:none; }
+
+/* fader */
+.fader { display:flex; align-items:center; gap:12px; margin: 14px 0 4px; }
+.fader label { font-size:9px; letter-spacing:.2em; color:var(--faint); white-space:nowrap; }
+.fader output { font-size:11px; color:var(--dim); min-width:34px; text-align:right; }
+input[type=range] { flex:1; -webkit-appearance:none; appearance:none; height: 22px; background: transparent; }
+input[type=range]::-webkit-slider-runnable-track { height: 4px; background:#0a0d08; border:1px solid var(--seam); border-radius:2px; box-shadow: inset 0 1px 3px #000; }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width: 14px; height: 22px; margin-top: -10px; border-radius:3px;
+  background: linear-gradient(180deg,#3b4436,#20251c); border:1px solid #000; box-shadow: 0 1px 0 rgba(255,255,255,.15) inset, 0 2px 3px #000; }
+input[type=range]::-moz-range-track { height: 4px; background:#0a0d08; border:1px solid var(--seam); border-radius:2px; }
+input[type=range]::-moz-range-thumb { width: 13px; height: 21px; border-radius:3px; background: linear-gradient(180deg,#3b4436,#20251c); border:1px solid #000; }
+
+/* progress + meters */
+.track { position:relative; height: 18px; background:#0a0d08; border:1px solid var(--seam); border-radius:3px;
+  box-shadow: inset 0 2px 6px rgba(0,0,0,.8); overflow:hidden; }
+.track .fill { position:absolute; inset:0 auto 0 0; width:0%;
+  background: repeating-linear-gradient(90deg, var(--amber-dim) 0 6px, #543d0e 6px 8px); }
+.rx .track .fill { background: repeating-linear-gradient(90deg, var(--green-dim) 0 6px, #1c4a2d 6px 8px); }
+.track .cap { position:absolute; top:0; bottom:0; width:2px; background:var(--amber); box-shadow:0 0 8px var(--amber); left:0%; }
+.rx .track .cap { background:var(--green); box-shadow:0 0 8px var(--green); }
+.trackrow { display:flex; align-items:center; gap:10px; margin-top:12px; }
+.trackrow .track { flex:1; }
+.trackrow .t { font-size:10px; color:var(--dim); min-width:86px; text-align:right; letter-spacing:.08em; }
+
+.meter { display:flex; align-items:center; gap:10px; margin-top:8px; }
+.meter .k { font-size:9px; letter-spacing:.2em; color:var(--faint); width: 34px; }
+.meter .track { flex:1; height: 10px; }
+.meter .t { font-size:10px; color:var(--dim); width: 64px; text-align:right; }
+
+canvas.scope { width: 100%; height: 120px; display: block; background: #060806;
+  border: 1px solid var(--seam); border-radius: 4px; box-shadow: inset 0 2px 10px rgba(0,0,0,.8); }
+
+/* output */
+.outwrap { margin-top: 14px; }
+pre.out {
+  background:#0a0d08; border:1px solid var(--seam); border-radius:4px; padding:10px;
+  min-height: 64px; max-height: 220px; overflow:auto; white-space: pre-wrap; word-break: break-word;
+  color: var(--green); text-shadow: 0 0 6px rgba(92,240,140,.25); font-size: 13px;
+  box-shadow: inset 0 2px 8px rgba(0,0,0,.7);
+}
+.outmeta { font-size:10px; letter-spacing:.12em; color:var(--dim); margin:6px 0; }
+.btnrow { display:flex; gap:10px; margin-top:8px; flex-wrap:wrap; }
+.btnrow button { flex:1 1 120px; }
+.errbox { display:none; margin-top:10px; border:1px solid #7a2a24; border-radius:4px; padding:9px 12px;
+  color: var(--red); font-size:12px; letter-spacing:.06em; background: rgba(255,80,64,.05); }
+.errbox.show { display:block; }
+
+/* log */
+.logwrap { background:#060806; border:1px solid var(--seam); border-radius:4px; padding:8px 10px;
+  height: 130px; overflow-y:auto; font-size:11px; box-shadow: inset 0 2px 8px rgba(0,0,0,.8); }
+.logwrap div { color: var(--dim); white-space: pre-wrap; word-break: break-word; }
+.logwrap div.g { color: var(--green); } .logwrap div.a { color: var(--amber); } .logwrap div.r { color: var(--red); }
+.cursor::after { content:"█"; color: var(--green); animation: blink 1.1s steps(2) infinite; }
+
+/* diagnostics */
+.diagout { font-size:11px; margin-top:10px; }
+.diagout div { padding: 2px 0; border-bottom: 1px dotted #1c2018; color: var(--dim); }
+.diagout .p::before { content:"PASS "; color: var(--green); letter-spacing:.1em; }
+.diagout .f::before { content:"FAIL "; color: var(--red); letter-spacing:.1em; }
+.diagout .s::before { content:"soft "; color: var(--amber); letter-spacing:.1em; }
+.badge { display:inline-block; padding:2px 10px; border-radius:3px; font-size:10px; letter-spacing:.2em; margin-left:8px; }
+.badge.ok { color:var(--green); border:1px solid var(--green-dim); }
+.badge.bad { color:var(--red); border:1px solid #7a2a24; }
+
+.hint { text-align:center; font-size:10px; letter-spacing:.16em; color:var(--faint); margin: 18px 4px 8px; line-height:1.9; }
+.hint b { color: var(--dim); font-weight:400; }
+footer { text-align:center; font-size:9px; letter-spacing:.2em; color:#33362e; margin-top:10px; }
+.hide { display:none !important; }
+
+@media (max-width: 620px) {
+  header.panel { grid-template-columns: 1fr; }
+  .grille { display:none; }
+  body { padding: 8px 6px 40px; }
+  .panel { padding: 14px 12px 12px; }
+}
+</style>
+</head>
+<body>
+<div class="chassis">
+
+  <header class="panel">
+    <span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
+    <div class="grille"></div>
+    <div class="masthead">
+      <h1>AIR<span class="gap">GAP</span></h1>
+      <div class="sub">ACOUSTIC DATA COUPLER · <em>MK-1</em> · NO WIRES · NO NETWORK</div>
+      <div class="profrow">
+        <span>BAND</span>
+        <span class="profsw">
+          <button id="profAud" class="sel">AUDIBLE 1.9–5.1 kHz</button>
+          <button id="profUlt">ULTRASONIC 16–19 kHz</button>
+        </span>
+        <span id="fsInfo">FS —</span>
+      </div>
+    </div>
+    <div class="grille"></div>
+  </header>
+
+  <div class="rocker" role="tablist">
+    <button id="tabTx" class="sel-tx" role="tab" aria-selected="true">▲ TRANSMIT</button>
+    <button id="tabRx" role="tab" aria-selected="false">▼ RECEIVE</button>
+  </div>
+
+  <!-- ================= TRANSMIT ================= -->
+  <section class="panel tx" id="txPanel">
+    <span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
+    <div class="plabel"><b>◤ TRANSMIT</b> MODULATOR — 16-FSK · RS(·,·+32) FEC <span class="tag">SPKR OUT</span></div>
+
+    <textarea id="txText" spellcheck="false" placeholder="TYPE MESSAGE…">Hello across the air gap 📡</textarea>
+    <div class="filebar">
+      <button id="txFileBtn">▤ LOAD FILE…</button>
+      <span class="filechip" id="txChip"><span id="txChipName"></span><button id="txChipClear" title="clear file">✕</button></span>
+      <input type="file" id="txFile">
+    </div>
+
+    <div class="readouts">
+      <div class="ro"><div class="k">PAYLOAD</div><div class="v" id="txBytes">0 B</div></div>
+      <div class="ro"><div class="k">EST. AIRTIME</div><div class="v" id="txDur">—</div></div>
+      <div class="ro"><div class="k">SYMBOL RATE</div><div class="v" id="txRate">11.1/s</div></div>
+    </div>
+
+    <div class="fader">
+      <label>VOLUME</label>
+      <input type="range" id="txVol" min="0" max="1" step="0.01" value="0.8">
+      <output id="txVolOut">0.80</output>
+    </div>
+
+    <button class="big arm" id="txSend">◉ TRANSMIT</button>
+    <div class="btnrow">
+      <button id="txAgain" class="hide">↻ SEND AGAIN</button>
+      <button id="txAbort" class="danger hide">■ ABORT</button>
+    </div>
+    <div class="trackrow">
+      <div class="track"><div class="fill" id="txFill"></div><div class="cap" id="txCap"></div></div>
+      <div class="t" id="txTime">0.0 / 0.0 s</div>
+    </div>
+    <div class="errbox" id="txErr"></div>
+  </section>
+
+  <!-- ================= RECEIVE ================= -->
+  <section class="panel rx hide" id="rxPanel">
+    <span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
+    <div class="plabel"><b>◤ RECEIVE</b> DEMODULATOR — STATE MACHINE · EARLY/LATE CLOCK <span class="tag">MIC IN</span></div>
+
+    <div class="ledrow">
+      <div class="led g" id="ledListen"><i></i><span>LISTEN</span></div>
+      <div class="led a" id="ledCarrier"><i></i><span>CARRIER</span></div>
+      <div class="led a" id="ledHeader"><i></i><span>HEADER</span></div>
+      <div class="led a" id="ledPayload"><i></i><span>PAYLOAD</span></div>
+      <div class="led g" id="ledDone"><i></i><span>OK</span></div>
+      <div class="led r" id="ledErr"><i></i><span>ERR</span></div>
+    </div>
+
+    <button class="big hot" id="rxStart">◉ START LISTENING</button>
+
+    <canvas class="scope" id="scope" style="margin-top:14px"></canvas>
+    <div class="meter"><span class="k">LVL</span><div class="track"><div class="fill" id="lvlFill"></div></div><span class="t" id="lvlTxt">−∞ dB</span></div>
+    <div class="meter"><span class="k">CNF</span><div class="track"><div class="fill" id="cnfFill"></div></div><span class="t" id="cnfTxt">— dB</span></div>
+
+    <div class="trackrow">
+      <div class="track"><div class="fill" id="rxFill"></div></div>
+      <div class="t" id="rxSym">SYM —/—</div>
+    </div>
+
+    <div class="outwrap">
+      <div class="outmeta" id="rxMeta">AWAITING TRANSMISSION</div>
+      <pre class="out" id="rxOut"></pre>
+      <div class="btnrow">
+        <button id="rxCopy" disabled>⧉ COPY TEXT</button>
+        <button id="rxSave" disabled>▼ DOWNLOAD BYTES</button>
+      </div>
+      <div class="errbox" id="rxErr"></div>
+    </div>
+  </section>
+
+  <!-- ================= DIAGNOSTICS ================= -->
+  <section class="panel" id="diagPanel">
+    <span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
+    <div class="plabel"><b>◤ DIAGNOSTICS</b> IN-MEMORY MODEM VERIFICATION <span class="tag">NO AUDIO USED</span></div>
+    <div class="btnrow">
+      <button id="diagLoop">▸ LOOPBACK SELF-TEST</button>
+      <button id="diagFull">▸ FULL TEST SUITE</button>
+      <span id="diagBadge"></span>
+    </div>
+    <div class="diagout" id="diagOut"></div>
+  </section>
+
+  <!-- ================= LOG ================= -->
+  <section class="panel">
+    <span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
+    <div class="plabel"><b>◤ EVENT LOG</b><span class="tag" id="logClock"></span></div>
+    <div class="logwrap" id="log"><div class="cursor g">airgap mk-1 ready</div></div>
+  </section>
+
+  <div class="hint">
+    <b>FIELD MANUAL:</b> HOLD DEVICES 30 CM – 1 M APART · RAISE VOLUME · QUIET ROOM HELPS<br>
+    ULTRASONIC BAND IS HARDWARE-DEPENDENT — BOTH ENDS MUST USE THE SAME BAND
+  </div>
+  <footer>SINGLE FILE · WORKS OFFLINE · ADD ?selftest TO URL FOR FULL DIAGNOSTIC BOOT</footer>
+</div>
+
+<script>
+/* ==== BEGIN AIRGAP CORE ====
+ * AirGap core DSP — pure JS, no browser APIs, usable in Node for testing.
+ * Sections: CRC, Reed-Solomon, FFT, Params/Profiles, Framing, Modulator,
+ * Demodulator, Loopback & self-tests.
+ */
+(function (root, factory) {
+  const api = factory();
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  else root.AirGap = api;
+})(typeof self !== 'undefined' ? self : this, function () {
+'use strict';
+
+// ---- Constants ----
+
+const SYMBOL_SEC = 0.09;      // symbol duration (s)
+const RAMP_SEC   = 0.008;     // raised-cosine edge ramp (s)
+const RS_DATA    = 223;       // data bytes per RS block
+const RS_PARITY  = 32;        // parity bytes per RS block (corrects 16)
+const HDR_PARITY = 8;         // parity bytes for the 4-byte header (corrects 4)
+const PREAMBLE_SYMS = 8;      // alternating P0/P1 symbols before sync
+const MAX_PAYLOAD = 8192;     // sanity cap (bytes)
+
+// Frequencies are absolute Hz so devices at different sample rates interoperate.
+// Audible spacing 187.5 Hz = exactly 8 bins at 48 kHz / FFT 2048; at 44.1 kHz the
+// tones land mid-bin, which the 3-bin energy sum absorbs.
+const PROFILES = {
+  audible:    { label: 'AUDIBLE',    f0: 1875,     df: 187.5,    fp0: 1500,     fp1: 5062.5 },
+  ultrasonic: { label: 'ULTRASONIC', f0: 16875,    df: 140.625,  fp0: 16406.25, fp1: 19335.9375 },
+};
+
+// ---- CRC ----
+
+function crc16(bytes) { // CRC-16/CCITT-FALSE: poly 0x1021, init 0xFFFF
+  let crc = 0xFFFF;
+  for (let i = 0; i < bytes.length; i++) {
+    crc ^= bytes[i] << 8;
+    for (let b = 0; b < 8; b++) {
+      crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1021) & 0xFFFF : (crc << 1) & 0xFFFF;
+    }
+  }
+  return crc;
+}
+
+const CRC32_TABLE = (function () {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+
+function crc32(bytes) {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++) c = CRC32_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+
+// ---- Reed-Solomon over GF(256), poly 0x11d, fcr = 0 ----
+
+const GF_EXP = new Uint8Array(512);
+const GF_LOG = new Uint8Array(256);
+(function () {
+  let x = 1;
+  for (let i = 0; i < 255; i++) {
+    GF_EXP[i] = x;
+    GF_LOG[x] = i;
+    x <<= 1;
+    if (x & 0x100) x ^= 0x11d;
+  }
+  for (let i = 255; i < 512; i++) GF_EXP[i] = GF_EXP[i - 255];
+})();
+
+function gfMul(a, b) { return (a === 0 || b === 0) ? 0 : GF_EXP[GF_LOG[a] + GF_LOG[b]]; }
+function gfDiv(a, b) { if (a === 0) return 0; return GF_EXP[(GF_LOG[a] - GF_LOG[b] + 255) % 255]; }
+function gfInv(a) { return GF_EXP[255 - GF_LOG[a]]; }
+function gfPowAlpha(n) { return GF_EXP[((n % 255) + 255) % 255]; } // alpha^n, n may be negative
+
+// Generator polynomial, descending order (g[0] = x^nsym coefficient = 1)
+const GEN_CACHE = {};
+function rsGenPoly(nsym) {
+  if (GEN_CACHE[nsym]) return GEN_CACHE[nsym];
+  let g = [1];
+  for (let i = 0; i < nsym; i++) {
+    // multiply g by (x + alpha^i)
+    const ng = new Array(g.length + 1).fill(0);
+    for (let j = 0; j < g.length; j++) {
+      ng[j] ^= g[j];
+      ng[j + 1] ^= gfMul(g[j], GF_EXP[i]);
+    }
+    g = ng;
+  }
+  GEN_CACHE[nsym] = g;
+  return g;
+}
+
+// Systematic encode: returns msg || parity. Shortened blocks work as-is.
+function rsEncode(msg, nsym) {
+  const gen = rsGenPoly(nsym);
+  const work = new Uint8Array(msg.length + nsym);
+  work.set(msg);
+  for (let i = 0; i < msg.length; i++) {
+    const coef = work[i];
+    if (coef !== 0) {
+      for (let j = 1; j < gen.length; j++) work[i + j] ^= gfMul(gen[j], coef);
+    }
+  }
+  const out = new Uint8Array(msg.length + nsym);
+  out.set(msg);
+  out.set(work.subarray(msg.length), msg.length);
+  return out;
+}
+
+// Evaluate polynomial with descending coefficients (index 0 = highest power)
+function polyEvalDesc(p, x) {
+  let y = 0;
+  for (let i = 0; i < p.length; i++) y = gfMul(y, x) ^ p[i];
+  return y;
+}
+
+// Evaluate polynomial with ascending coefficients (index i = coeff of x^i)
+function polyEvalAsc(p, x) {
+  let y = 0;
+  for (let i = p.length - 1; i >= 0; i--) y = gfMul(y, x) ^ p[i];
+  return y;
+}
+
+// Berlekamp–Massey. Syndromes S ascending. Returns error locator (ascending, C[0]=1).
+function berlekampMassey(S, nsym) {
+  let C = [1], B = [1], L = 0, m = 1, b = 1;
+  for (let n = 0; n < nsym; n++) {
+    let d = S[n];
+    for (let i = 1; i <= L; i++) d ^= gfMul(C[i] || 0, S[n - i]);
+    if (d === 0) { m++; continue; }
+    const T = C.slice();
+    const coef = gfMul(d, gfInv(b));
+    // C = C + coef * x^m * B
+    const need = B.length + m;
+    while (C.length < need) C.push(0);
+    for (let i = 0; i < B.length; i++) C[i + m] ^= gfMul(coef, B[i]);
+    if (2 * L <= n) { L = n + 1 - L; B = T; b = d; m = 1; }
+    else m++;
+  }
+  return { C, L };
+}
+
+// Decode in place a codeword of length n with nsym parity bytes.
+// Returns { data, corrected } or null if uncorrectable.
+function rsDecode(msgIn, nsym) {
+  const n = msgIn.length;
+  if (n <= nsym || n > 255) return null;
+  const msg = Uint8Array.from(msgIn);
+  const S = new Array(nsym);
+  let clean = true;
+  for (let i = 0; i < nsym; i++) {
+    S[i] = polyEvalDesc(msg, GF_EXP[i]);
+    if (S[i] !== 0) clean = false;
+  }
+  if (clean) return { data: msg.slice(0, n - nsym), corrected: 0 };
+
+  const { C, L } = berlekampMassey(S, nsym);
+  let deg = C.length - 1;
+  while (deg > 0 && C[deg] === 0) deg--;
+  if (deg !== L || L === 0 || 2 * L > nsym) return null;
+
+  // Chien search: position j (0 = first byte) has power p = n-1-j; root at alpha^-p
+  const pos = [];
+  for (let j = 0; j < n; j++) {
+    if (polyEvalAsc(C, gfPowAlpha(-(n - 1 - j))) === 0) pos.push(j);
+  }
+  if (pos.length !== deg) return null;
+
+  // Omega = S(x) * C(x) mod x^nsym  (ascending)
+  const Omega = new Array(nsym).fill(0);
+  for (let i = 0; i < nsym; i++) {
+    if (S[i] === 0) continue;
+    for (let j = 0; j < C.length && i + j < nsym; j++) Omega[i + j] ^= gfMul(S[i], C[j]);
+  }
+  // Formal derivative of C (GF(2^m): even-power terms vanish)
+  const Cd = new Array(Math.max(1, C.length - 1)).fill(0);
+  for (let k = 1; k < C.length; k += 2) Cd[k - 1] = C[k];
+
+  // Forney: e_j = X_j * Omega(X_j^-1) / C'(X_j^-1)   (fcr = 0)
+  for (const j of pos) {
+    const p = n - 1 - j;
+    const Xinv = gfPowAlpha(-p);
+    const den = polyEvalAsc(Cd, Xinv);
+    if (den === 0) return null;
+    const num = gfMul(gfPowAlpha(p), polyEvalAsc(Omega, Xinv));
+    msg[j] ^= gfDiv(num, den);
+  }
+  // Verify: all syndromes must now be zero
+  for (let i = 0; i < nsym; i++) {
+    if (polyEvalDesc(msg, GF_EXP[i]) !== 0) return null;
+  }
+  return { data: msg.slice(0, n - nsym), corrected: pos.length };
+}
+
+// ---- FFT (iterative radix-2, in place) ----
+
+function fftInPlace(re, im) {
+  const n = re.length;
+  for (let i = 1, j = 0; i < n; i++) {
+    let bit = n >> 1;
+    for (; j & bit; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if (i < j) {
+      let t = re[i]; re[i] = re[j]; re[j] = t;
+      t = im[i]; im[i] = im[j]; im[j] = t;
+    }
+  }
+  for (let len = 2; len <= n; len <<= 1) {
+    const ang = -2 * Math.PI / len;
+    const wr = Math.cos(ang), wi = Math.sin(ang);
+    const half = len >> 1;
+    for (let i = 0; i < n; i += len) {
+      let cr = 1, ci = 0;
+      for (let j = 0; j < half; j++) {
+        const a = i + j, b = a + half;
+        const tr = re[b] * cr - im[b] * ci;
+        const ti = re[b] * ci + im[b] * cr;
+        re[b] = re[a] - tr; im[b] = im[a] - ti;
+        re[a] += tr; im[a] += ti;
+        const nr = cr * wr - ci * wi;
+        ci = cr * wi + ci * wr;
+        cr = nr;
+      }
+    }
+  }
+}
+
+function hannWindow(n) {
+  const w = new Float32Array(n);
+  for (let i = 0; i < n; i++) w[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / (n - 1));
+  return w;
+}
+
+// ---- Params (everything derived from the actual sample rate) ----
+
+function makeParams(fs, profileName) {
+  const prof = PROFILES[profileName || 'audible'];
+  if (!prof) throw new Error('unknown profile: ' + profileName);
+  const symbolLen = Math.round(SYMBOL_SEC * fs);
+  const rampLen = Math.round(RAMP_SEC * fs);
+  const flat = symbolLen - 2 * rampLen;
+  let fftSize = 512;
+  while (fftSize * 2 <= flat * 0.9 && fftSize < 4096) fftSize <<= 1;
+
+  const dataFreqs = [];
+  for (let k = 0; k < 16; k++) dataFreqs.push(prof.f0 + prof.df * k);
+  const binOf = (f) => Math.round(f * fftSize / fs);
+  const half = fftSize >> 1;
+  const loF = Math.min(prof.fp0, dataFreqs[0]);
+  const hiF = Math.max(prof.fp1, dataFreqs[15]);
+  if (hiF >= fs / 2 * 0.98) throw new Error('profile does not fit below Nyquist at fs=' + fs);
+
+  return {
+    fs, profile: profileName || 'audible', prof,
+    symbolLen, rampLen, fftSize,
+    hop: fftSize >> 2,
+    dataFreqs,
+    dataBins: dataFreqs.map(binOf),
+    binP0: binOf(prof.fp0),
+    binP1: binOf(prof.fp1),
+    fp0: prof.fp0, fp1: prof.fp1,
+    bandLo: Math.max(1, binOf(loF) - 6),
+    bandHi: Math.min(half - 2, binOf(hiF) + 6),
+    elDelta: Math.round(symbolLen / 5),          // early-late probe offset
+    nudge: Math.max(4, Math.round(fs * 0.002)),  // clock correction step per symbol
+  };
+}
+
+// ---- Framing ----
+
+function concatBytes(list) {
+  let n = 0;
+  for (const a of list) n += a.length;
+  const out = new Uint8Array(n);
+  let off = 0;
+  for (const a of list) { out.set(a, off); off += a.length; }
+  return out;
+}
+
+function bodyLengthFor(payloadLen) {
+  let d = payloadLen + 4; // payload + CRC-32
+  const nblocks = Math.ceil(d / RS_DATA);
+  return d + nblocks * RS_PARITY;
+}
+
+function totalSymbolsFor(payloadLen) {
+  // preamble + sync + header (12 bytes) + body + end marker
+  return PREAMBLE_SYMS + 1 + 12 * 2 + bodyLengthFor(payloadLen) * 2 + 1;
+}
+
+function estimateSeconds(payloadLen) {
+  return totalSymbolsFor(payloadLen) * SYMBOL_SEC + 0.5; // + lead/tail padding
+}
+
+// header: [len_hi, len_lo, crc16_hi, crc16_lo] + 8 RS parity = 12 bytes
+// body:   (payload || CRC-32) chunked into <=223-byte blocks, each + 32 parity
+function encodeFrame(payload) {
+  if (payload.length < 1 || payload.length > MAX_PAYLOAD) throw new Error('payload size out of range');
+  const withCrc = new Uint8Array(payload.length + 4);
+  withCrc.set(payload);
+  const c = crc32(payload);
+  withCrc[payload.length] = (c >>> 24) & 0xFF;
+  withCrc[payload.length + 1] = (c >>> 16) & 0xFF;
+  withCrc[payload.length + 2] = (c >>> 8) & 0xFF;
+  withCrc[payload.length + 3] = c & 0xFF;
+
+  const blocks = [];
+  for (let off = 0; off < withCrc.length; off += RS_DATA) {
+    blocks.push(rsEncode(withCrc.subarray(off, Math.min(off + RS_DATA, withCrc.length)), RS_PARITY));
+  }
+  const hdrPlain = new Uint8Array(4);
+  hdrPlain[0] = (payload.length >> 8) & 0xFF;
+  hdrPlain[1] = payload.length & 0xFF;
+  const hc = crc16(hdrPlain.subarray(0, 2));
+  hdrPlain[2] = (hc >> 8) & 0xFF;
+  hdrPlain[3] = hc & 0xFF;
+  return { header: rsEncode(hdrPlain, HDR_PARITY), body: concatBytes(blocks) };
+}
+
+// ---- Modulator ----
+
+// Symbol list: each entry is an array of 1 or 2 frequencies (2 = dual-tone marker)
+function frameSymbolFreqs(payload, p) {
+  const { header, body } = encodeFrame(payload);
+  const syms = [];
+  for (let i = 0; i < PREAMBLE_SYMS; i++) syms.push([i % 2 === 0 ? p.fp0 : p.fp1]);
+  syms.push([p.fp0, p.fp1]); // sync marker: both preamble tones at once
+  const pushBytes = (bytes) => {
+    for (let i = 0; i < bytes.length; i++) {
+      syms.push([p.dataFreqs[bytes[i] >> 4]]);
+      syms.push([p.dataFreqs[bytes[i] & 0x0F]]);
+    }
+  };
+  pushBytes(header);
+  pushBytes(body);
+  syms.push([p.fp0, p.fp1]); // end marker
+  return syms;
+}
+
+// Synthesize the whole frame into one Float32Array. Tones are phase-locked to
+// global time, so repeated frequencies stay phase-continuous across symbols.
+function modulate(payload, p, opts) {
+  opts = opts || {};
+  const amp = opts.amplitude != null ? opts.amplitude : 0.8;
+  const syms = frameSymbolFreqs(payload, p);
+  const N = p.symbolLen, R = p.rampLen;
+  const lead = Math.round(0.3 * p.fs), tail = Math.round(0.2 * p.fs);
+  const out = new Float32Array(lead + syms.length * N + tail);
+  const twoPiOverFs = 2 * Math.PI / p.fs;
+  for (let s = 0; s < syms.length; s++) {
+    const freqs = syms[s];
+    const a = amp / freqs.length;
+    const base = lead + s * N;
+    for (let n = 0; n < N; n++) {
+      let env = 1;
+      if (n < R) env = 0.5 - 0.5 * Math.cos(Math.PI * n / R);
+      else if (n >= N - R) env = 0.5 - 0.5 * Math.cos(Math.PI * (N - n) / R);
+      const t = base + n;
+      let v = 0;
+      for (let f = 0; f < freqs.length; f++) v += Math.sin(twoPiOverFs * freqs[f] * t);
+      out[base + n] = a * env * v;
+    }
+  }
+  return out;
+}
+
+// ---- Demodulator ----
+
+// Detection thresholds (power ratios)
+const TONE_THR = 25;   // tone power vs band noise floor
+const DOM_THR  = 4;    // dominance of one preamble tone over the other
+const DUAL_MIN = 0.25; // min/max power ratio for the dual-tone sync marker
+const EL_IMBALANCE = 0.15; // early-late gate deadband
+
+class Demodulator {
+  constructor(fs, profileName, cb) {
+    this.fs = fs;
+    this.p = makeParams(fs, profileName);
+    this.cb = cb || {};
+    let capBits = 15;
+    while ((1 << capBits) < this.p.symbolLen * 16 + this.p.fftSize * 2) capBits++;
+    this.cap = 1 << capBits;
+    this.mask = this.cap - 1;
+    this.buf = new Float32Array(this.cap);
+    this.total = 0;
+    this.re = new Float32Array(this.p.fftSize);
+    this.im = new Float32Array(this.p.fftSize);
+    this.win = hannWindow(this.p.fftSize);
+    this.pow = new Float32Array(this.p.fftSize >> 1); // last spectrum (for UI)
+    this.scratch = new Float32Array(this.p.bandHi - this.p.bandLo + 1);
+    this.lastRms = 0;
+    this.lastConfDb = 0;
+    this._toListening();
+  }
+
+  _setState(s) {
+    this.state = s;
+    if (this.cb.onState) this.cb.onState(s);
+  }
+
+  _toListening() {
+    this.hist = [];
+    this.nibbles = [];
+    this.confs = [];
+    this.expected = 0;
+    this.preTicks = 0;
+    this.missTicks = 0;
+    this.hdrCorrected = 0;
+    this.payloadLen = 0;
+    this.symCenter = 0;
+    this.nextHop = Math.max(this.total, this.p.fftSize);
+    this._setState('LISTENING');
+  }
+
+  reset() { this.total = 0; this._toListening(); this.nextHop = this.p.fftSize; }
+
+  push(chunk) {
+    const buf = this.buf, mask = this.mask;
+    let sq = 0;
+    for (let i = 0; i < chunk.length; i++) {
+      buf[this.total & mask] = chunk[i];
+      this.total++;
+      sq += chunk[i] * chunk[i];
+    }
+    if (chunk.length) {
+      const rms = Math.sqrt(sq / chunk.length);
+      this.lastRms = Math.max(rms, this.lastRms * 0.85);
+    }
+    let guard = 0;
+    while (this._step() && guard++ < 4096) { /* drain */ }
+  }
+
+  _at(i) { return this.buf[i & this.mask]; }
+
+  // Windowed FFT centered at absolute sample index `center`; fills this.pow.
+  _spectrumAt(center) {
+    const P = this.p, half = P.fftSize >> 1;
+    let start = center - half;
+    if (start < 0) start = 0;
+    const re = this.re, im = this.im, win = this.win, buf = this.buf, mask = this.mask;
+    for (let n = 0; n < P.fftSize; n++) {
+      re[n] = buf[(start + n) & mask] * win[n];
+      im[n] = 0;
+    }
+    fftInPlace(re, im);
+    const pow = this.pow;
+    for (let k = 0; k < half; k++) pow[k] = re[k] * re[k] + im[k] * im[k];
+    return pow;
+  }
+
+  _floor(pow) {
+    const P = this.p, s = this.scratch;
+    let n = 0;
+    for (let k = P.bandLo; k <= P.bandHi; k++) s[n++] = pow[k];
+    const arr = s.subarray(0, n);
+    Array.prototype.sort.call(arr, (a, b) => a - b);
+    return Math.max(arr[n >> 1], 1e-10);
+  }
+
+  _tonePow(pow, bin) {
+    return pow[bin - 1] + pow[bin] + pow[bin + 1];
+  }
+
+  // Goertzel power at arbitrary frequency over [start, start+len) of the ring
+  _goertzel(start, len, freq) {
+    const w = 2 * Math.PI * freq / this.fs;
+    const c = 2 * Math.cos(w);
+    const buf = this.buf, mask = this.mask;
+    let s1 = 0, s2 = 0;
+    for (let n = 0; n < len; n++) {
+      const s0 = buf[(start + n) & mask] + c * s1 - s2;
+      s2 = s1; s1 = s0;
+    }
+    return s1 * s1 + s2 * s2 - c * s1 * s2;
+  }
+
+  // Early-late gate: compare tone energy slightly before/after the assumed
+  // center and nudge the symbol clock. Handles TX/RX clock drift.
+  _clockAdjust(freq) {
+    const P = this.p, half = P.fftSize >> 1;
+    const e = this._goertzel(this.symCenter - P.elDelta - half, P.fftSize, freq);
+    const l = this._goertzel(this.symCenter + P.elDelta - half, P.fftSize, freq);
+    const imb = (l - e) / (l + e + 1e-12);
+    if (imb > EL_IMBALANCE) return P.nudge;
+    if (imb < -EL_IMBALANCE) return -P.nudge;
+    return 0;
+  }
+
+  _fail(code) {
+    if (this.cb.onResult) this.cb.onResult({ ok: false, error: code });
+    this._setState('FAILED');
+    this._toListening();
+  }
+
+  _step() {
+    if (this.state === 'LISTENING') return this._stepListen();
+    return this._stepSymbol();
+  }
+
+  _stepListen() {
+    const P = this.p;
+    const end = this.nextHop;
+    if (end > this.total) return false;
+    if (end - P.fftSize < this.total - this.cap) { this.nextHop = this.total; return true; }
+    const center = end - (P.fftSize >> 1);
+    const pow = this._spectrumAt(center);
+    const floor = this._floor(pow);
+    const p0 = this._tonePow(pow, P.binP0);
+    const p1 = this._tonePow(pow, P.binP1);
+    let cls = -1;
+    if (p0 > TONE_THR * floor && p0 > DOM_THR * p1) cls = 0;
+    else if (p1 > TONE_THR * floor && p1 > DOM_THR * p0) cls = 1;
+    this.hist.push({ t: center, cls });
+    if (this.hist.length > 120) this.hist.shift();
+    this.nextHop += P.hop;
+    this._tryLock();
+    return true;
+  }
+
+  // Estimate symbol boundaries from transitions between alternating preamble
+  // tones and lock the symbol clock once boundary spacing matches symbolLen.
+  _tryLock() {
+    const P = this.p;
+    const runs = [];
+    for (const h of this.hist) {
+      const last = runs[runs.length - 1];
+      if (last && last.cls === h.cls) { last.tEnd = h.t; last.n++; }
+      else runs.push({ cls: h.cls, tStart: h.t, tEnd: h.t, n: 1 });
+    }
+    // tone runs only; short "neither" gaps around boundaries are skipped
+    const tone = runs.filter(r => r.cls >= 0 && r.n >= 2);
+    const bounds = [];
+    for (let i = 1; i < tone.length; i++) {
+      const a = tone[i - 1], b = tone[i];
+      if (a.cls === b.cls) continue;
+      const gap = b.tStart - a.tEnd;
+      if (gap < 0 || gap > P.symbolLen * 0.8) continue;
+      bounds.push((a.tEnd + b.tStart) / 2);
+    }
+    if (bounds.length < 3) return;
+    const d1 = bounds[bounds.length - 1] - bounds[bounds.length - 2];
+    const d2 = bounds[bounds.length - 2] - bounds[bounds.length - 3];
+    const ok = (d) => d > P.symbolLen * 0.7 && d < P.symbolLen * 1.3;
+    if (!ok(d1) || !ok(d2)) return;
+    this.symCenter = Math.round(bounds[bounds.length - 1] + P.symbolLen / 2);
+    this.hist = [];
+    this.preTicks = 0;
+    this.missTicks = 0;
+    this._setState('PREAMBLE');
+  }
+
+  _stepSymbol() {
+    const P = this.p, half = P.fftSize >> 1;
+    if (this.symCenter + half + P.elDelta + 1 > this.total) return false;
+    if (this.symCenter - half - P.elDelta < this.total - this.cap) {
+      // fell too far behind realtime; ring overwritten
+      this._fail('LOST_SIGNAL');
+      return true;
+    }
+    const pow = this._spectrumAt(this.symCenter);
+    const floor = this._floor(pow);
+    const p0 = this._tonePow(pow, P.binP0);
+    const p1 = this._tonePow(pow, P.binP1);
+
+    if (this.state === 'PREAMBLE') {
+      const mx = Math.max(p0, p1), mn = Math.min(p0, p1);
+      if (mn > DUAL_MIN * mx && mn > 8 * floor) {
+        // sync marker: header starts on the next symbol
+        this.nibbles = [];
+        this.confs = [];
+        this.expected = 12 * 2;
+        this._setState('HEADER');
+        this.symCenter += P.symbolLen;
+        return true;
+      }
+      if (mx > TONE_THR * floor) {
+        this.preTicks++;
+        if (this.preTicks > 24) { this._toListening(); return true; }
+        this.symCenter += P.symbolLen + this._clockAdjust(p0 > p1 ? P.fp0 : P.fp1);
+        return true;
+      }
+      if (++this.missTicks > 2) { this._toListening(); return true; }
+      this.symCenter += P.symbolLen;
+      return true;
+    }
+
+    // HEADER / PAYLOAD: pick strongest of the 16 data tones
+    let best = 0, bestPow = -1, secondPow = 0;
+    for (let k = 0; k < 16; k++) {
+      const v = this._tonePow(pow, P.dataBins[k]);
+      if (v > bestPow) { secondPow = bestPow; bestPow = v; best = k; }
+      else if (v > secondPow) secondPow = v;
+    }
+    const conf = bestPow / Math.max(secondPow, 1e-10);
+    this.lastConfDb = 10 * Math.log10(Math.max(conf, 1));
+    this.nibbles.push(best);
+    this.confs.push(this.lastConfDb);
+    if (this.cb.onProgress) this.cb.onProgress(this.nibbles.length, this.expected, this.state);
+    const adj = this._clockAdjust(P.dataFreqs[best]);
+    this.symCenter += P.symbolLen + adj;
+
+    if (this.nibbles.length >= this.expected) {
+      if (this.state === 'HEADER') this._finishHeader();
+      else this._finishPayload();
+    }
+    return true;
+  }
+
+  _nibblesToBytes() {
+    const out = new Uint8Array(this.nibbles.length >> 1);
+    for (let i = 0; i < out.length; i++) {
+      out[i] = (this.nibbles[2 * i] << 4) | this.nibbles[2 * i + 1];
+    }
+    return out;
+  }
+
+  _finishHeader() {
+    const dec = rsDecode(this._nibblesToBytes(), HDR_PARITY);
+    if (!dec) { this._fail('HEADER_FAIL'); return; }
+    const d = dec.data;
+    const len = (d[0] << 8) | d[1];
+    const crc = (d[2] << 8) | d[3];
+    if (crc16(d.subarray(0, 2)) !== crc || len < 1 || len > MAX_PAYLOAD) {
+      this._fail('HEADER_FAIL');
+      return;
+    }
+    this.payloadLen = len;
+    this.hdrCorrected = dec.corrected;
+    this.nibbles = [];
+    this.expected = bodyLengthFor(len) * 2;
+    this._setState('PAYLOAD');
+  }
+
+  _finishPayload() {
+    const bytes = this._nibblesToBytes();
+    let off = 0, remaining = this.payloadLen + 4, corrected = this.hdrCorrected;
+    const chunks = [];
+    while (remaining > 0) {
+      const k = Math.min(RS_DATA, remaining);
+      const dec = rsDecode(bytes.subarray(off, off + k + RS_PARITY), RS_PARITY);
+      if (!dec) { this._fail('RS_FAIL'); return; }
+      chunks.push(dec.data);
+      corrected += dec.corrected;
+      off += k + RS_PARITY;
+      remaining -= k;
+    }
+    const withCrc = concatBytes(chunks);
+    const payload = withCrc.slice(0, this.payloadLen);
+    const want = ((withCrc[this.payloadLen] << 24) | (withCrc[this.payloadLen + 1] << 16) |
+                  (withCrc[this.payloadLen + 2] << 8) | withCrc[this.payloadLen + 3]) >>> 0;
+    if (crc32(payload) !== want) { this._fail('CRC_FAIL'); return; }
+    let minConf = Infinity, sum = 0;
+    for (const c of this.confs) { if (c < minConf) minConf = c; sum += c; }
+    const stats = {
+      corrected,
+      minConfDb: this.confs.length ? minConf : 0,
+      avgConfDb: this.confs.length ? sum / this.confs.length : 0,
+      symbols: this.confs.length,
+    };
+    if (this.cb.onResult) this.cb.onResult({ ok: true, payload, stats });
+    this._setState('DONE');
+    this._toListening();
+  }
+}
+
+// ---- Loopback & self-tests ----
+
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function gaussian(rand) {
+  const u = 1 - rand(), v = rand();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+
+function resampleLinear(sig, ratio) {
+  const n = Math.floor((sig.length - 1) / ratio);
+  const out = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const x = i * ratio;
+    const j = Math.floor(x);
+    const f = x - j;
+    out[i] = sig[j] * (1 - f) + sig[j + 1] * f;
+  }
+  return out;
+}
+
+function rmsOf(sig) {
+  let s = 0;
+  for (let i = 0; i < sig.length; i++) s += sig[i] * sig[i];
+  return Math.sqrt(s / sig.length);
+}
+
+// In-memory TX->RX round trip (no audio hardware). Options:
+//   snrDb: add white gaussian noise at this SNR; drift: resample ratio
+function loopback(payload, fs, opts) {
+  opts = opts || {};
+  const p = makeParams(fs, opts.profile || 'audible');
+  let sig = modulate(payload, p, { amplitude: 0.8 });
+  if (opts.drift && opts.drift !== 1) sig = resampleLinear(sig, opts.drift);
+  if (opts.snrDb != null) {
+    const rand = mulberry32(opts.seed || 0xA1B2C3);
+    const noiseRms = rmsOf(sig) / Math.pow(10, opts.snrDb / 20);
+    for (let i = 0; i < sig.length; i++) sig[i] += gaussian(rand) * noiseRms;
+  }
+  let result = null;
+  const d = new Demodulator(fs, opts.profile || 'audible', {
+    onResult: (r) => { if (!result) result = r; },
+  });
+  for (let off = 0; off < sig.length; off += 1024) {
+    d.push(sig.subarray(off, Math.min(off + 1024, sig.length)));
+  }
+  d.push(new Float32Array(Math.round(fs * 0.3)));
+  return { result, seconds: sig.length / fs };
+}
+
+function bytesEqual(a, b) {
+  if (!a || !b || a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
+function textBytes(s) {
+  if (typeof TextEncoder !== 'undefined') return new TextEncoder().encode(s);
+  const out = new Uint8Array(s.length);
+  for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i) & 0xFF;
+  return out;
+}
+
+// Each test: { name, hard, run() -> {pass, detail} }
+function selfTests() {
+  const rand = mulberry32(0xC0FFEE);
+  const randBytes = (n) => {
+    const b = new Uint8Array(n);
+    for (let i = 0; i < n; i++) b[i] = Math.floor(rand() * 256);
+    return b;
+  };
+  const corrupt = (block, nErrors) => {
+    const c = Uint8Array.from(block);
+    const used = new Set();
+    for (let e = 0; e < nErrors; e++) {
+      let pos;
+      do { pos = Math.floor(rand() * c.length); } while (used.has(pos));
+      used.add(pos);
+      c[pos] ^= 1 + Math.floor(rand() * 255);
+    }
+    return c;
+  };
+  const T = [];
+  const test = (name, hard, run) => T.push({ name, hard, run });
+
+  test('CRC-16/CCITT test vector ("123456789" = 0x29B1)', true, () => {
+    const v = crc16(textBytes('123456789'));
+    return { pass: v === 0x29B1, detail: '0x' + v.toString(16).toUpperCase() };
+  });
+
+  test('CRC-32 test vector ("123456789" = 0xCBF43926)', true, () => {
+    const v = crc32(textBytes('123456789'));
+    return { pass: v === 0xCBF43926, detail: '0x' + v.toString(16).toUpperCase() };
+  });
+
+  test('FFT: pure sine lands in its bin', true, () => {
+    const N = 2048, bin = 100;
+    const re = new Float32Array(N), im = new Float32Array(N);
+    for (let n = 0; n < N; n++) re[n] = Math.sin(2 * Math.PI * bin * n / N);
+    fftInPlace(re, im);
+    let peak = 0, pv = -1;
+    for (let k = 1; k < N / 2; k++) {
+      const p = re[k] * re[k] + im[k] * im[k];
+      if (p > pv) { pv = p; peak = k; }
+    }
+    return { pass: peak === bin, detail: 'peak at bin ' + peak };
+  });
+
+  test('RS(255,223): clean round trip', true, () => {
+    const msg = randBytes(223);
+    const dec = rsDecode(rsEncode(msg, RS_PARITY), RS_PARITY);
+    const pass = !!dec && bytesEqual(dec.data, msg) && dec.corrected === 0;
+    return { pass, detail: pass ? 'ok' : 'mismatch' };
+  });
+
+  test('RS(255,223): corrects 16 byte errors (20 trials)', true, () => {
+    for (let t = 0; t < 20; t++) {
+      const msg = randBytes(223);
+      const enc = rsEncode(msg, RS_PARITY);
+      const dec = rsDecode(corrupt(enc, 16), RS_PARITY);
+      if (!dec || !bytesEqual(dec.data, msg) || dec.corrected !== 16) {
+        return { pass: false, detail: 'trial ' + t + ' failed' };
+      }
+    }
+    return { pass: true, detail: '20/20 corrected 16 errors' };
+  });
+
+  test('RS(255,223): rejects 17 byte errors (10 trials)', true, () => {
+    let nulls = 0, miscorrect = 0;
+    for (let t = 0; t < 10; t++) {
+      const msg = randBytes(223);
+      const enc = rsEncode(msg, RS_PARITY);
+      const dec = rsDecode(corrupt(enc, 17), RS_PARITY);
+      if (dec === null) nulls++;
+      else if (!bytesEqual(dec.data, msg)) miscorrect++;
+      else return { pass: false, detail: 'impossibly recovered 17 errors' };
+    }
+    return { pass: nulls >= 8, detail: nulls + '/10 rejected, ' + miscorrect + ' miscorrected (rare, caught by CRC-32)' };
+  });
+
+  test('RS shortened header block (4+8): corrects 4 errors', true, () => {
+    for (let t = 0; t < 10; t++) {
+      const msg = randBytes(4);
+      const enc = rsEncode(msg, HDR_PARITY);
+      const dec = rsDecode(corrupt(enc, 4), HDR_PARITY);
+      if (!dec || !bytesEqual(dec.data, msg)) return { pass: false, detail: 'trial ' + t + ' failed' };
+    }
+    return { pass: true, detail: '10/10' };
+  });
+
+  test('RS shortened block (100+32): corrects 16 errors', true, () => {
+    const msg = randBytes(100);
+    const enc = rsEncode(msg, RS_PARITY);
+    const dec = rsDecode(corrupt(enc, 16), RS_PARITY);
+    const pass = !!dec && bytesEqual(dec.data, msg);
+    return { pass, detail: pass ? 'ok' : 'failed' };
+  });
+
+  const MSG50 = textBytes('THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG 0123456789').slice(0, 50);
+
+  const modemTest = (name, hard, fs, opts, payload) => {
+    test(name, hard, () => {
+      const { result, seconds } = loopback(payload || MSG50, fs, opts);
+      const pass = !!result && result.ok && bytesEqual(result.payload, payload || MSG50);
+      const detail = pass
+        ? seconds.toFixed(1) + 's audio, ' + result.stats.corrected + ' bytes corrected, conf min ' +
+          result.stats.minConfDb.toFixed(1) + ' dB'
+        : (result ? (result.ok ? 'payload mismatch' : 'error: ' + result.error) : 'no frame detected');
+      return { pass, detail, seconds };
+    });
+  };
+
+  modemTest('Loopback clean @ 48000 Hz (50-byte payload)', true, 48000, {});
+  modemTest('Loopback clean @ 44100 Hz', true, 44100, {});
+  modemTest('Loopback clean, ultrasonic profile @ 48000 Hz', true, 48000, { profile: 'ultrasonic' });
+  modemTest('Loopback + white noise, SNR 20 dB', true, 48000, { snrDb: 20 });
+  modemTest('Loopback + white noise, SNR 10 dB', true, 48000, { snrDb: 10 });
+  modemTest('Loopback + white noise, SNR 6 dB', true, 48000, { snrDb: 6 });
+  modemTest('Loopback + white noise, SNR 3 dB (stretch)', false, 48000, { snrDb: 3 });
+  modemTest('Loopback + clock drift +0.2% (2000 ppm)', true, 48000, { drift: 1.002 });
+  modemTest('Loopback + clock drift -0.2% + noise 20 dB', true, 48000, { drift: 0.998, snrDb: 20 });
+  modemTest('Loopback multi-block payload (300 bytes) @ 48000 Hz', true, 48000, { snrDb: 20 }, randBytes(300));
+  modemTest('Loopback 1-byte payload', true, 48000, {}, new Uint8Array([0x42]));
+
+  test('50-byte frame duration is 10-20 s and matches estimate', true, () => {
+    const est = estimateSeconds(50);
+    const actual = modulate(MSG50, makeParams(48000, 'audible')).length / 48000;
+    const pass = actual >= 10 && actual <= 20 && Math.abs(actual - est) < 1;
+    return { pass, detail: 'actual ' + actual.toFixed(2) + 's, estimate ' + est.toFixed(2) + 's' };
+  });
+
+  return T;
+}
+
+return {
+  SYMBOL_SEC, RS_DATA, RS_PARITY, HDR_PARITY, PREAMBLE_SYMS, MAX_PAYLOAD, PROFILES,
+  crc16, crc32,
+  rsEncode, rsDecode,
+  fftInPlace, hannWindow,
+  makeParams, encodeFrame, bodyLengthFor, totalSymbolsFor, estimateSeconds,
+  frameSymbolFreqs, modulate,
+  Demodulator,
+  loopback, resampleLinear, mulberry32, bytesEqual, textBytes,
+  selfTests,
+};
+});
+/* ==== END AIRGAP CORE ==== */
+</script>
+<script>
+/* ---- UI ---- */
+(function () {
+'use strict';
+const $ = (id) => document.getElementById(id);
+const on = (id, ev, fn) => $(id).addEventListener(ev, fn);
+
+let ctx = null;            // AudioContext, created on first user gesture (iOS)
+let profileName = 'audible';
+let mode = 'tx';
+
+// ---- helpers ----
+function fmtBytes(n) {
+  if (n < 1024) return n + ' B';
+  return (n / 1024).toFixed(n < 10240 ? 2 : 1) + ' KB';
+}
+function fmtSecs(s) { return s >= 60 ? Math.floor(s / 60) + 'm ' + Math.round(s % 60) + 's' : s.toFixed(1) + ' s'; }
+function now() { return new Date().toTimeString().slice(0, 8); }
+function log(msg, cls) {
+  const el = $('log');
+  const old = el.querySelector('.cursor');
+  if (old) old.classList.remove('cursor');
+  const d = document.createElement('div');
+  d.textContent = now() + '  ' + msg;
+  if (cls) d.classList.add(cls);
+  d.classList.add('cursor');
+  el.appendChild(d);
+  while (el.childElementCount > 80) el.removeChild(el.firstChild);
+  el.scrollTop = el.scrollHeight;
+}
+function ensureCtx() {
+  if (!ctx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    ctx = new AC();
+    log('audio context up · fs ' + ctx.sampleRate + ' Hz');
+    const p = AirGap.makeParams(ctx.sampleRate, profileName);
+    $('fsInfo').textContent = 'FS ' + ctx.sampleRate + ' Hz · FFT ' + p.fftSize;
+  }
+  if (ctx.state === 'suspended') ctx.resume();
+  return ctx;
+}
+
+// ---- profile switch ----
+function setProfile(name) {
+  profileName = name;
+  $('profAud').classList.toggle('sel', name === 'audible');
+  $('profUlt').classList.toggle('sel', name === 'ultrasonic');
+  log('band set to ' + AirGap.PROFILES[name].label);
+  if (listening) restartDemod();
+}
+on('profAud', 'click', () => setProfile('audible'));
+on('profUlt', 'click', () => setProfile('ultrasonic'));
+
+// ---- mode rocker ----
+function setMode(m) {
+  mode = m;
+  $('tabTx').className = m === 'tx' ? 'sel-tx' : '';
+  $('tabRx').className = m === 'rx' ? 'sel-rx' : '';
+  $('tabTx').setAttribute('aria-selected', m === 'tx');
+  $('tabRx').setAttribute('aria-selected', m === 'rx');
+  $('txPanel').classList.toggle('hide', m !== 'tx');
+  $('rxPanel').classList.toggle('hide', m !== 'rx');
+}
+on('tabTx', 'click', () => setMode('tx'));
+on('tabRx', 'click', () => setMode('rx'));
+
+// ================= TRANSMIT =================
+let filePayload = null, fileLabel = '';
+let txSource = null, txGain = null, txStartAt = 0, txDurSec = 0, txPlaying = false;
+let lastSig = null, lastRate = 0;
+
+function currentPayload() {
+  if (filePayload) return filePayload;
+  return new TextEncoder().encode($('txText').value);
+}
+function refreshTxInfo() {
+  const n = currentPayload().length;
+  $('txBytes').textContent = fmtBytes(n) + (filePayload ? ' ▤' : '');
+  $('txDur').textContent = n ? fmtSecs(AirGap.estimateSeconds(n)) : '—';
+  $('txSend').disabled = txPlaying || n === 0 || n > AirGap.MAX_PAYLOAD;
+  const err = $('txErr');
+  if (n > AirGap.MAX_PAYLOAD) {
+    err.textContent = 'PAYLOAD TOO LARGE — LIMIT ' + fmtBytes(AirGap.MAX_PAYLOAD);
+    err.classList.add('show');
+  } else err.classList.remove('show');
+}
+on('txText', 'input', refreshTxInfo);
+on('txFileBtn', 'click', () => $('txFile').click());
+on('txFile', 'change', async () => {
+  const f = $('txFile').files[0];
+  if (!f) return;
+  const buf = new Uint8Array(await f.arrayBuffer());
+  filePayload = buf;
+  fileLabel = f.name;
+  $('txChipName').textContent = f.name + ' · ' + fmtBytes(buf.length);
+  $('txChip').classList.add('show');
+  log('file loaded: ' + f.name + ' (' + buf.length + ' B)');
+  refreshTxInfo();
+});
+on('txChipClear', 'click', () => {
+  filePayload = null; fileLabel = '';
+  $('txFile').value = '';
+  $('txChip').classList.remove('show');
+  refreshTxInfo();
+});
+on('txVol', 'input', () => {
+  $('txVolOut').textContent = Number($('txVol').value).toFixed(2);
+  if (txGain) txGain.gain.value = Number($('txVol').value);
+});
+
+function stopTx(aborted) {
+  if (txSource) { try { txSource.onended = null; txSource.stop(); } catch (e) {} }
+  txSource = null; txPlaying = false;
+  $('txAbort').classList.add('hide');
+  $('txAgain').classList.toggle('hide', !lastSig);
+  $('txSend').textContent = '◉ TRANSMIT';
+  refreshTxInfo();
+  if (aborted) log('transmission aborted', 'r');
+}
+
+function playSignal(sig) {
+  const c = ensureCtx();
+  const buf = c.createBuffer(1, sig.length, c.sampleRate);
+  buf.getChannelData(0).set(sig);
+  txGain = c.createGain();
+  txGain.gain.value = Number($('txVol').value);
+  txSource = c.createBufferSource();
+  txSource.buffer = buf;
+  txSource.connect(txGain);
+  txGain.connect(c.destination);
+  txDurSec = sig.length / c.sampleRate;
+  txStartAt = c.currentTime;
+  txPlaying = true;
+  $('txSend').disabled = true;
+  $('txAbort').classList.remove('hide');
+  $('txAgain').classList.add('hide');
+  txSource.onended = () => { stopTx(false); log('transmission complete', 'a'); };
+  txSource.start();
+  requestAnimationFrame(txAnim);
+}
+
+function txAnim() {
+  if (!txPlaying) { $('txFill').style.width = '100%'; $('txCap').style.left = '100%'; return; }
+  const t = Math.min(ctx.currentTime - txStartAt, txDurSec);
+  const pct = (txDurSec ? t / txDurSec * 100 : 0).toFixed(2) + '%';
+  $('txFill').style.width = pct;
+  $('txCap').style.left = pct;
+  $('txTime').textContent = t.toFixed(1) + ' / ' + txDurSec.toFixed(1) + ' s';
+  requestAnimationFrame(txAnim);
+}
+
+async function transmit() {
+  const payload = currentPayload();
+  if (!payload.length || payload.length > AirGap.MAX_PAYLOAD) return;
+  const c = ensureCtx();
+  await c.resume();          // iOS: must resume inside the gesture
+  log('modulating ' + payload.length + ' B (' + (filePayload ? fileLabel : 'text') + ') · ' +
+      AirGap.PROFILES[profileName].label);
+  // yield one frame so the UI shows state before the (brief) synth burst
+  await new Promise(r => setTimeout(r, 30));
+  const p = AirGap.makeParams(c.sampleRate, profileName);
+  const sig = AirGap.modulate(payload, p, { amplitude: 1.0 });
+  lastSig = sig; lastRate = c.sampleRate;
+  log('on air · ' + fmtSecs(sig.length / c.sampleRate), 'a');
+  playSignal(sig);
+}
+on('txSend', 'click', transmit);
+on('txAgain', 'click', async () => {
+  const c = ensureCtx();
+  await c.resume();
+  if (!lastSig) return;
+  if (lastRate !== c.sampleRate) { transmit(); return; } // rate changed, re-synthesize
+  log('re-sending previous frame', 'a');
+  playSignal(lastSig);
+});
+on('txAbort', 'click', () => stopTx(true));
+
+// ================= RECEIVE =================
+let listening = false, demod = null, micStream = null, micNode = null, tapNode = null, sinkNode = null;
+let rxGot = 0, rxExpected = 0, rxRaf = 0;
+let lastResultBytes = null, lastResultText = null;
+
+const WORKLET_SRC = `
+class AirgapCapture extends AudioWorkletProcessor {
+  constructor() { super(); this.acc = new Float32Array(2048); this.n = 0; }
+  process(inputs) {
+    const ch = inputs[0] && inputs[0][0];
+    if (ch) {
+      let i = 0;
+      while (i < ch.length) {
+        const take = Math.min(ch.length - i, 2048 - this.n);
+        this.acc.set(ch.subarray(i, i + take), this.n);
+        this.n += take; i += take;
+        if (this.n === 2048) { this.port.postMessage(this.acc.slice(0)); this.n = 0; }
+      }
+    }
+    return true;
+  }
+}
+registerProcessor('airgap-capture', AirgapCapture);`;
+let workletReady = false;
+
+const LEDS = { LISTENING: 'ledListen', PREAMBLE: 'ledCarrier', HEADER: 'ledHeader', PAYLOAD: 'ledPayload' };
+function setLeds(state) {
+  for (const k in LEDS) {
+    const el = $(LEDS[k]);
+    el.classList.toggle('on', k === state);
+    el.classList.toggle('blink', k === state && k !== 'LISTENING');
+  }
+}
+function flashLed(id) {
+  $(id).classList.add('on');
+  setTimeout(() => { if (!listening || id === 'ledDone' || id === 'ledErr') $(id).classList.remove('on'); }, 4000);
+}
+
+const ERRORS = {
+  HEADER_FAIL: 'HEADER CRC FAILED — length field did not verify; frame rejected',
+  RS_FAIL: 'RS DECODE FAILED — too many symbol errors for FEC to repair',
+  CRC_FAIL: 'PAYLOAD CRC FAILED — corruption beyond what RS could fix',
+  LOST_SIGNAL: 'SIGNAL LOST — audio buffer overrun during decode',
+};
+
+function demodCallbacks() {
+  return {
+    onState: (s) => {
+      setLeds(s);
+      if (s === 'PREAMBLE') {
+        log('carrier detected — preamble lock', 'g');
+        $('ledDone').classList.remove('on'); $('ledErr').classList.remove('on');
+        $('rxErr').classList.remove('show');
+      } else if (s === 'HEADER') log('sync marker — reading header');
+      else if (s === 'PAYLOAD') {
+        log('header ok — ' + demod.payloadLen + ' B incoming (' +
+            fmtSecs(demod.expected / 2 * 2 * AirGap.SYMBOL_SEC) + ')', 'g');
+      }
+      if (s !== 'PAYLOAD' && s !== 'HEADER') { rxGot = 0; rxExpected = 0; }
+    },
+    onProgress: (got, expected) => { rxGot = got; rxExpected = expected; },
+    onResult: (r) => {
+      if (r.ok) {
+        lastResultBytes = r.payload;
+        lastResultText = null;
+        try { lastResultText = new TextDecoder('utf-8', { fatal: true }).decode(r.payload); } catch (e) {}
+        $('rxOut').textContent = lastResultText !== null
+          ? lastResultText
+          : '[binary payload — ' + r.payload.length + ' bytes]\n' + hexPreview(r.payload);
+        $('rxMeta').textContent = 'RECEIVED ' + fmtBytes(r.payload.length) +
+          (lastResultText !== null ? ' UTF-8 TEXT' : ' BINARY') +
+          ' · RS CORRECTED ' + r.stats.corrected + ' B' +
+          ' · CONF MIN ' + r.stats.minConfDb.toFixed(1) + ' dB';
+        $('rxCopy').disabled = lastResultText === null;
+        $('rxSave').disabled = false;
+        flashLed('ledDone');
+        log('✓ payload received · ' + r.payload.length + ' B · ' + r.stats.corrected + ' corrected', 'g');
+      } else {
+        $('rxErr').textContent = ERRORS[r.error] || r.error;
+        $('rxErr').classList.add('show');
+        flashLed('ledErr');
+        log('✗ decode failed: ' + (ERRORS[r.error] || r.error), 'r');
+      }
+    },
+  };
+}
+
+function hexPreview(bytes) {
+  const n = Math.min(bytes.length, 512);
+  let out = '';
+  for (let i = 0; i < n; i += 16) {
+    let line = i.toString(16).padStart(4, '0') + '  ';
+    for (let j = i; j < Math.min(i + 16, n); j++) line += bytes[j].toString(16).padStart(2, '0') + ' ';
+    out += line + '\n';
+  }
+  if (bytes.length > n) out += '… ' + (bytes.length - n) + ' more bytes';
+  return out;
+}
+
+function restartDemod() {
+  if (!ctx) return;
+  demod = new AirGap.Demodulator(ctx.sampleRate, profileName, demodCallbacks());
+  setLeds('LISTENING');
+}
+
+async function startListening() {
+  const c = ensureCtx();
+  await c.resume();
+  $('rxErr').classList.remove('show');
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    micFail('MICROPHONE API UNAVAILABLE — use HTTPS or localhost');
+    return;
+  }
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+    });
+  } catch (e) {
+    micFail(e && e.name === 'NotAllowedError'
+      ? 'MICROPHONE PERMISSION DENIED — allow mic access and retry'
+      : 'MICROPHONE ERROR — ' + (e && e.name || e));
+    return;
+  }
+  restartDemod();
+  micNode = c.createMediaStreamSource(micStream);
+  let usingWorklet = false;
+  if (c.audioWorklet) {
+    try {
+      if (!workletReady) {
+        const url = URL.createObjectURL(new Blob([WORKLET_SRC], { type: 'application/javascript' }));
+        await c.audioWorklet.addModule(url);
+        URL.revokeObjectURL(url);
+        workletReady = true;
+      }
+      tapNode = new AudioWorkletNode(c, 'airgap-capture');
+      tapNode.port.onmessage = (e) => { if (demod) demod.push(e.data); };
+      usingWorklet = true;
+    } catch (e) { tapNode = null; }
+  }
+  if (!tapNode) { // deprecated fallback, kept simple on purpose
+    tapNode = c.createScriptProcessor(4096, 1, 1);
+    tapNode.onaudioprocess = (ev) => { if (demod) demod.push(ev.inputBuffer.getChannelData(0)); };
+  }
+  sinkNode = c.createGain();
+  sinkNode.gain.value = 0; // keep the graph pulling samples without feedback
+  micNode.connect(tapNode);
+  tapNode.connect(sinkNode);
+  sinkNode.connect(c.destination);
+  listening = true;
+  $('rxStart').textContent = '■ STOP LISTENING';
+  $('rxStart').classList.remove('hot');
+  $('rxStart').classList.add('danger');
+  log('listening (' + (usingWorklet ? 'AudioWorklet' : 'ScriptProcessor fallback') + ') · ' +
+      AirGap.PROFILES[profileName].label, 'g');
+  rxRaf = requestAnimationFrame(rxAnim);
+}
+
+function stopListening() {
+  listening = false;
+  cancelAnimationFrame(rxRaf);
+  if (micStream) micStream.getTracks().forEach(t => t.stop());
+  try { if (micNode) micNode.disconnect(); } catch (e) {}
+  try { if (tapNode) { tapNode.disconnect(); if (tapNode.port) tapNode.port.onmessage = null; else tapNode.onaudioprocess = null; } } catch (e) {}
+  try { if (sinkNode) sinkNode.disconnect(); } catch (e) {}
+  micStream = micNode = tapNode = sinkNode = null;
+  demod = null;
+  $('rxStart').textContent = '◉ START LISTENING';
+  $('rxStart').classList.add('hot');
+  $('rxStart').classList.remove('danger');
+  setLeds('');
+  log('listening stopped');
+}
+on('rxStart', 'click', () => (listening ? stopListening() : startListening()));
+
+function micFail(msg) {
+  $('rxErr').textContent = msg;
+  $('rxErr').classList.add('show');
+  log('mic error: ' + msg, 'r');
+}
+
+// ---- RX visualization ----
+function rxAnim() {
+  if (!listening) return;
+  drawScope();
+  const rmsDb = demod && demod.lastRms > 0 ? 20 * Math.log10(demod.lastRms) : -100;
+  $('lvlFill').style.width = Math.max(0, Math.min(100, (rmsDb + 60) / 60 * 100)) + '%';
+  $('lvlTxt').textContent = (rmsDb <= -99 ? '−∞' : rmsDb.toFixed(0)) + ' dB';
+  const conf = demod ? demod.lastConfDb : 0;
+  $('cnfFill').style.width = Math.max(0, Math.min(100, conf / 30 * 100)) + '%';
+  $('cnfTxt').textContent = conf ? conf.toFixed(1) + ' dB' : '— dB';
+  if (rxExpected) {
+    $('rxFill').style.width = (rxGot / rxExpected * 100).toFixed(1) + '%';
+    $('rxSym').textContent = 'SYM ' + rxGot + '/' + rxExpected;
+  } else {
+    $('rxFill').style.width = '0%';
+    $('rxSym').textContent = 'SYM —/—';
+  }
+  rxRaf = requestAnimationFrame(rxAnim);
+}
+
+function drawScope() {
+  const cv = $('scope');
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth * dpr, h = cv.clientHeight * dpr;
+  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+  const g = cv.getContext('2d');
+  g.fillStyle = 'rgba(6,8,6,0.45)'; // phosphor decay
+  g.fillRect(0, 0, w, h);
+  if (!demod) return;
+  const p = demod.p, pow = demod.pow;
+  const lo = p.bandLo, hi = p.bandHi, nb = hi - lo + 1;
+  // graticule
+  g.strokeStyle = 'rgba(90,100,80,0.12)';
+  g.lineWidth = 1;
+  for (let i = 1; i < 4; i++) { g.beginPath(); g.moveTo(0, h * i / 4); g.lineTo(w, h * i / 4); g.stroke(); }
+  // tone markers
+  for (const b of p.dataBins) {
+    const x = (b - lo) / nb * w;
+    g.fillStyle = 'rgba(255,176,32,0.25)';
+    g.fillRect(x, h - 5 * dpr, Math.max(1, dpr), 5 * dpr);
+  }
+  for (const b of [p.binP0, p.binP1]) {
+    const x = (b - lo) / nb * w;
+    g.fillStyle = 'rgba(255,80,64,0.5)';
+    g.fillRect(x, h - 8 * dpr, Math.max(1, dpr), 8 * dpr);
+  }
+  // spectrum trace
+  g.strokeStyle = '#5cf08c';
+  g.shadowColor = '#5cf08c';
+  g.shadowBlur = 6 * dpr;
+  g.lineWidth = Math.max(1, dpr);
+  g.beginPath();
+  for (let i = 0; i < nb; i++) {
+    const db = 10 * Math.log10(pow[lo + i] + 1e-12);
+    const y = h - Math.max(0, Math.min(1, (db + 90) / 85)) * h;
+    const x = i / nb * w;
+    if (i === 0) g.moveTo(x, y); else g.lineTo(x, y);
+  }
+  g.stroke();
+  g.shadowBlur = 0;
+}
+
+// ================= DIAGNOSTICS =================
+const tick = () => new Promise(r => setTimeout(r, 15));
+
+async function runLoopback() {
+  $('diagOut').innerHTML = '';
+  $('diagBadge').innerHTML = '';
+  $('diagLoop').disabled = $('diagFull').disabled = true;
+  log('loopback self-test running…');
+  const fs = (ctx && ctx.sampleRate) || 48000;
+  const msg = AirGap.textBytes('AIRGAP LOOPBACK ' + Date.now());
+  const cases = [
+    ['clean @ ' + fs + ' Hz', {}],
+    ['white noise SNR 10 dB', { snrDb: 10 }],
+  ];
+  let allOk = true;
+  for (const [name, opts] of cases) {
+    await tick();
+    const t0 = performance.now();
+    let ok = false, detail = '';
+    try {
+      const { result, seconds } = AirGap.loopback(msg, fs, opts);
+      ok = !!result && result.ok && AirGap.bytesEqual(result.payload, msg);
+      detail = ok ? seconds.toFixed(1) + 's audio decoded in ' + ((performance.now() - t0) / 1000).toFixed(1) + 's'
+                  : (result ? 'error: ' + (result.error || 'mismatch') : 'no frame detected');
+    } catch (e) { detail = 'exception: ' + e; }
+    diagLine(ok ? 'p' : 'f', 'Loopback ' + name + ' — ' + detail);
+    allOk = allOk && ok;
+  }
+  $('diagBadge').innerHTML = '<span class="badge ' + (allOk ? 'ok">LOOPBACK PASS' : 'bad">LOOPBACK FAIL') + '</span>';
+  log('loopback self-test: ' + (allOk ? 'PASS' : 'FAIL'), allOk ? 'g' : 'r');
+  $('diagLoop').disabled = $('diagFull').disabled = false;
+}
+
+async function runFullSuite() {
+  $('diagOut').innerHTML = '';
+  $('diagBadge').innerHTML = '';
+  $('diagLoop').disabled = $('diagFull').disabled = true;
+  log('full test suite running…');
+  console.log('=== AIRGAP SELF-TEST ===');
+  let hardFails = 0, count = 0;
+  for (const t of AirGap.selfTests()) {
+    await tick();
+    let r;
+    try { r = t.run(); }
+    catch (e) { r = { pass: false, detail: 'EXCEPTION: ' + e }; }
+    const cls = r.pass ? 'p' : (t.hard ? 'f' : 's');
+    diagLine(cls, t.name + ' — ' + r.detail);
+    console.log((r.pass ? 'PASS' : (t.hard ? 'FAIL' : 'soft-fail')) + '  ' + t.name + ' — ' + r.detail);
+    if (!r.pass && t.hard) hardFails++;
+    count++;
+  }
+  const ok = hardFails === 0;
+  $('diagBadge').innerHTML = '<span class="badge ' + (ok ? 'ok">' + count + ' TESTS PASS' : 'bad">' + hardFails + ' FAILURES') + '</span>';
+  console.log(ok ? 'ALL HARD TESTS PASSED' : hardFails + ' HARD FAILURES');
+  log('test suite: ' + (ok ? 'all ' + count + ' tests passed' : hardFails + ' hard failures'), ok ? 'g' : 'r');
+  $('diagLoop').disabled = $('diagFull').disabled = false;
+}
+function diagLine(cls, text) {
+  const d = document.createElement('div');
+  d.className = cls;
+  d.textContent = text;
+  $('diagOut').appendChild(d);
+}
+on('diagLoop', 'click', runLoopback);
+on('diagFull', 'click', runFullSuite);
+
+// ---- copy / save ----
+on('rxCopy', 'click', async () => {
+  if (lastResultText === null) return;
+  try {
+    await navigator.clipboard.writeText(lastResultText);
+    log('copied to clipboard', 'g');
+  } catch (e) {
+    const ta = document.createElement('textarea');
+    ta.value = lastResultText;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    ta.remove();
+    log('copied to clipboard (fallback)', 'g');
+  }
+});
+on('rxSave', 'click', () => {
+  if (!lastResultBytes) return;
+  const blob = new Blob([lastResultBytes], { type: 'application/octet-stream' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'airgap-payload.bin';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  log('payload saved as airgap-payload.bin');
+});
+
+// ---- boot ----
+setInterval(() => { $('logClock').textContent = now(); }, 1000);
+refreshTxInfo();
+setMode('tx');
+if (new URLSearchParams(location.search).has('selftest')) {
+  log('?selftest — diagnostic boot', 'a');
+  setTimeout(runFullSuite, 300);
+}
+})();
+</script>
+</body>
+</html>
