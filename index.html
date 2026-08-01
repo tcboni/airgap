@@ -2142,7 +2142,9 @@ NO FRAME RECEIVED YET</pre
             this.p = makeParams(fs, profileName, speedName, extra);
             this.cb = cb || {};
             let capBits = 15;
-            while (1 << capBits < this.p.symbolLen * 16 + this.p.fftSize * 2)
+            // ring must retain the whole header (24 symbols) plus preamble
+            // margin so _stepRetry can re-read it at shifted symbol grids
+            while (1 << capBits < this.p.symbolLen * 40 + this.p.fftSize * 2)
               capBits++;
             this.cap = 1 << capBits;
             this.mask = this.cap - 1;
@@ -2174,6 +2176,11 @@ NO FRAME RECEIVED YET</pre
             this.payloadLen = 0;
             this.rxParity = RS_PARITY;
             this.symCenter = 0;
+            this.refine = false;
+            this.straddleRefines = 0;
+            this.hdrStart = 0;
+            this.retryOffsets = null;
+            this.retryIdx = 0;
             this.nextHop = Math.max(this.total, this.p.fftSize);
             this._setState("LISTENING");
           }
@@ -2285,6 +2292,80 @@ NO FRAME RECEIVED YET</pre
             return 0;
           }
 
+          // Fine symbol-clock phase search. The lock phase from _tryLock is
+          // hop-quantized (can be off by a large fraction of a symbol) and the
+          // early-late gate corrects too slowly to converge before the header.
+          // Scan ±half a symbol for the offset where one preamble tone most
+          // dominates the other: |e0-e1| peaks when the analysis window sits
+          // fully inside one alternating-tone symbol and collapses when it
+          // straddles a boundary (both tones present).
+          _refinePhase() {
+            const P = this.p,
+              half = P.fftSize >> 1;
+            const hs = P.symbolLen >> 1;
+            const step = Math.max(16, P.symbolLen >> 4);
+            const metricAt = (c) => {
+              const pow = this._spectrumAt(c);
+              return Math.abs(
+                this._tonePow(pow, P.binP0) - this._tonePow(pow, P.binP1),
+              );
+            };
+            const m0 = metricAt(this.symCenter);
+            let bestOff = 0,
+              bestMetric = m0;
+            for (let d = -hs; d <= hs; d += step) {
+              const c = this.symCenter + d;
+              if (d === 0 || c - half < 0 || c - half < this.total - this.cap)
+                continue;
+              const m = metricAt(c);
+              if (m > bestMetric) {
+                bestMetric = m;
+                bestOff = d;
+              }
+            }
+            // only snap when clearly better than the current phase: echoes bias
+            // the metric slightly, and an already-decent lock plus the early-
+            // late gate beats a biased jump
+            if (bestMetric > 2 * m0) this.symCenter += bestOff;
+          }
+
+          // True sync markers follow a pure single-tone preamble symbol; a
+          // dual-tone reading whose *previous* symbol was also dual means the
+          // window is straddling a boundary, not sitting on the sync marker.
+          _prevSymbolSingle() {
+            const P = this.p,
+              half = P.fftSize >> 1;
+            const c = this.symCenter - P.symbolLen;
+            if (c - half < 0 || c - half < this.total - this.cap) return true; // no history — can't verify
+            const pow = this._spectrumAt(c);
+            const e0 = this._tonePow(pow, P.binP0);
+            const e1 = this._tonePow(pow, P.binP1);
+            return Math.max(e0, e1) > DOM_THR * Math.min(e0, e1);
+          }
+
+          // Strongest of the 16 data tones in a spectrum + confidence (dB over
+          // the runner-up tone)
+          _pickTone(pow) {
+            const P = this.p;
+            let best = 0,
+              bestPow = -1,
+              secondPow = 0;
+            for (let k = 0; k < 16; k++) {
+              const v = this._tonePow(pow, P.dataBins[k]);
+              if (v > bestPow) {
+                secondPow = bestPow;
+                bestPow = v;
+                best = k;
+              } else if (v > secondPow) secondPow = v;
+            }
+            const conf = bestPow / Math.max(secondPow, 1e-10);
+            return { nib: best, conf: 10 * Math.log10(Math.max(conf, 1)) };
+          }
+
+          _readSymbolAt(center) {
+            return this._pickTone(this._spectrumAt(center));
+          }
+
           _fail(code) {
             if (this.cb.onResult) this.cb.onResult({ ok: false, error: code });
             this._setState("FAILED");
@@ -2293,6 +2374,7 @@ NO FRAME RECEIVED YET</pre
 
           _step() {
             if (this.state === "LISTENING") return this._stepListen();
+            if (this.state === "HEADER_RETRY") return this._stepRetry();
             return this._stepSymbol();
           }
 
@@ -2353,12 +2435,23 @@ NO FRAME RECEIVED YET</pre
             this.hist = [];
             this.preTicks = 0;
             this.missTicks = 0;
+            // boundary estimates are hop-quantized; snap the phase properly
+            // before the first symbol read (see _refinePhase)
+            this.refine = true;
+            this.straddleRefines = 0;
             this._setState("PREAMBLE");
           }
 
           _stepSymbol() {
             const P = this.p,
               half = P.fftSize >> 1;
+            if (this.state === "PREAMBLE" && this.refine) {
+              // wait until the whole ±half-symbol scan range has arrived
+              if (this.symCenter + half + (P.symbolLen >> 1) + 1 > this.total)
+                return false;
+              this._refinePhase();
+              this.refine = false;
+            }
             if (this.symCenter + half + P.elDelta + 1 > this.total)
               return false;
             if (this.symCenter - half - P.elDelta < this.total - this.cap) {
@@ -2375,13 +2468,25 @@ NO FRAME RECEIVED YET</pre
               const mx = Math.max(p0, p1),
                 mn = Math.min(p0, p1);
               if (mn > DUAL_MIN * mx && mn > 8 * floor) {
-                // sync marker: header starts on the next symbol
-                this.nibbles = [];
-                this.confs = [];
-                this.expected = 12 * 2;
-                this._setState("HEADER");
-                this.symCenter += P.symbolLen;
-                return true;
+                if (this._prevSymbolSingle()) {
+                  // sync marker: header starts on the next symbol
+                  this.nibbles = [];
+                  this.confs = [];
+                  this.expected = 12 * 2;
+                  this._setState("HEADER");
+                  this.symCenter += P.symbolLen;
+                  this.hdrStart = this.symCenter;
+                  return true;
+                }
+                // both tones, but the previous symbol was dual too: we're
+                // straddling a boundary, not on the sync marker — re-derive
+                // the clock phase and re-inspect from the snapped position
+                if (this.straddleRefines < 2) {
+                  this.straddleRefines++;
+                  this.refine = true;
+                  return true;
+                }
+                // still ambiguous — fall through and track as preamble
               }
               if (mx > TONE_THR * floor) {
                 this.preTicks++;
@@ -2402,19 +2507,9 @@ NO FRAME RECEIVED YET</pre
             }
 
             // HEADER / PAYLOAD: pick strongest of the 16 data tones
-            let best = 0,
-              bestPow = -1,
-              secondPow = 0;
-            for (let k = 0; k < 16; k++) {
-              const v = this._tonePow(pow, P.dataBins[k]);
-              if (v > bestPow) {
-                secondPow = bestPow;
-                bestPow = v;
-                best = k;
-              } else if (v > secondPow) secondPow = v;
-            }
-            const conf = bestPow / Math.max(secondPow, 1e-10);
-            this.lastConfDb = 10 * Math.log10(Math.max(conf, 1));
+            const picked = this._pickTone(pow);
+            const best = picked.nib;
+            this.lastConfDb = picked.conf;
             this.nibbles.push(best);
             this.confs.push(this.lastConfDb);
             if (this.cb.onProgress)
@@ -2457,12 +2552,10 @@ NO FRAME RECEIVED YET</pre
             return out;
           }
 
-          _finishHeader() {
-            const dec = rsDecode(this._nibblesToBytes(), HDR_PARITY);
-            if (!dec) {
-              this._fail("HEADER_FAIL");
-              return;
-            }
+          // RS-decode + verify 12 header bytes; null if they don't check out
+          _parseHeader(bytes) {
+            const dec = rsDecode(bytes, HDR_PARITY);
+            if (!dec) return null;
             const d = dec.data;
             const fecCode = d[0] >> 6;
             const len = ((d[0] & 0x3f) << 8) | d[1];
@@ -2472,13 +2565,68 @@ NO FRAME RECEIVED YET</pre
               fecCode === 3 ||
               len < 1 ||
               len > MAX_PAYLOAD
-            ) {
-              this._fail("HEADER_FAIL");
+            )
+              return null;
+            return { len, parity: FEC_FROM_CODE[fecCode], corrected: dec.corrected };
+          }
+
+          _finishHeader() {
+            const h = this._parseHeader(this._nibblesToBytes());
+            if (h) {
+              this._acceptHeader(h);
               return;
             }
+            // header didn't verify on the tracked symbol grid — before
+            // rejecting the frame, re-read it from the ring at shifted grids:
+            // fractional offsets cover a clock that locked off-center, ±1
+            // whole symbol covers a sync marker that fired early/late
+            const s = this.p.symbolLen;
+            this.retryOffsets = [-(s >> 2), s >> 2, -(s >> 1), s >> 1, -s, s];
+            this.retryIdx = 0;
+            // internal state only (no _setState): the UI keeps showing HEADER
+            this.state = "HEADER_RETRY";
+          }
+
+          _stepRetry() {
+            const P = this.p,
+              half = P.fftSize >> 1;
+            while (this.retryIdx < this.retryOffsets.length) {
+              const off = this.retryOffsets[this.retryIdx];
+              const lastC = this.hdrStart + 23 * P.symbolLen + off;
+              if (lastC + half + 1 > this.total) return false; // wait for audio
+              this.retryIdx++;
+              if (this.hdrStart + off - half < this.total - this.cap)
+                continue; // start of header already overwritten in the ring
+              const nibs = [],
+                confs = [];
+              for (let k = 0; k < 24; k++) {
+                const r = this._readSymbolAt(
+                  this.hdrStart + k * P.symbolLen + off,
+                );
+                nibs.push(r.nib);
+                confs.push(r.conf);
+              }
+              const bytes = new Uint8Array(12);
+              for (let i = 0; i < 12; i++)
+                bytes[i] = (nibs[2 * i] << 4) | nibs[2 * i + 1];
+              const h = this._parseHeader(bytes);
+              if (h) {
+                this.confs = confs;
+                // the offset that decoded is the true grid; realign for payload
+                this.symCenter = this.hdrStart + 24 * P.symbolLen + off;
+                this._acceptHeader(h);
+                return true;
+              }
+            }
+            this._fail("HEADER_FAIL");
+            return true;
+          }
+
+          _acceptHeader(h) {
+            const len = h.len;
             this.payloadLen = len;
-            this.rxParity = FEC_FROM_CODE[fecCode]; // sender's FEC, from header
-            this.hdrCorrected = dec.corrected;
+            this.rxParity = h.parity; // sender's FEC, from header
+            this.hdrCorrected = h.corrected;
             this.nibbles = [];
             this.expected = bodyLengthFor(len, this.rxParity) * 2;
             // wire-position -> payload-byte-index map (-1 = RS parity or CRC-32
