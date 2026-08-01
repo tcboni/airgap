@@ -105,12 +105,14 @@
         flex: 1;
         display: flex;
         min-height: 96px;
+        max-height: 150px;
         margin-bottom: 8px;
       }
       #monPanel .scope {
         flex: 1;
         height: auto;
         min-height: 96px;
+        max-height: 150px;
       }
       @media (max-width: 940px) {
         .cols {
@@ -722,6 +724,14 @@
         flex-wrap: wrap;
         margin: 12px 0;
       }
+      /* the five RX tiles share one row, never wrapping */
+      .rx .readouts {
+        flex-wrap: nowrap;
+      }
+      .rx .readouts .ro {
+        flex: 1 1 0;
+        min-width: 0;
+      }
       .ro {
         flex: 1 1 110px;
         background: #0a0d08;
@@ -751,7 +761,7 @@
       textarea {
         width: 100%;
         min-height: 220px; /* matches the receive output area */
-        resize: vertical;
+        resize: none;
         background: #0a0d08;
         color: var(--ink);
         border: 1px solid var(--seam);
@@ -940,12 +950,6 @@
       }
       pre.insp.amber {
         color: var(--amber-dim);
-      }
-      .outmeta {
-        font-size: 10px;
-        letter-spacing: 0.12em;
-        color: var(--dim);
-        margin: 6px 0;
       }
       .btnrow {
         display: flex;
@@ -1193,17 +1197,24 @@
               </div>
               <div
                 class="led a"
-                id="ledEncode"
-                data-tip="Encoding: framing, Reed-Solomon parity and tone synthesis. Quick — it usually just blinks past."
+                id="ledTxCarrier"
+                data-tip="On air: preamble + sync marker — the alternating tones the receiver locks its symbol clock onto."
               >
-                <i></i><span>ENCODE</span>
+                <i></i><span>CARRIER</span>
               </div>
               <div
                 class="led a"
-                id="ledOnAir"
-                data-tip="The frame is playing through the speaker."
+                id="ledTxHeader"
+                data-tip="On air: the RS-protected length header (24 symbols)."
               >
-                <i></i><span>ON AIR</span>
+                <i></i><span>HEADER</span>
+              </div>
+              <div
+                class="led a"
+                id="ledTxPayload"
+                data-tip="On air: payload symbols plus Reed-Solomon parity and the CRC-32 trailer."
+              >
+                <i></i><span>PAYLOAD</span>
               </div>
               <div
                 class="led ann"
@@ -1356,10 +1367,23 @@ Hello across the air gap 📡</textarea
                 <div class="k">SYMBOL RATE</div>
                 <div class="v" id="rxRate">—</div>
               </div>
+              <div
+                class="ro"
+                data-tip="Payload format of the last decode: valid UTF-8 renders as text; anything else shows as a hex dump (DOWNLOAD always gives the exact bytes)."
+              >
+                <div class="k">FORMAT</div>
+                <div class="v" id="rxFmt">—</div>
+              </div>
+              <div
+                class="ro"
+                data-tip="Bytes the Reed-Solomon decoder repaired in the last frame. A health gauge: 0 is a clean channel, numbers near the FEC limit mean you're living on the edge."
+              >
+                <div class="k">RS FIXED</div>
+                <div class="v" id="rxFix">—</div>
+              </div>
             </div>
 
             <div class="outwrap">
-              <div class="outmeta" id="rxMeta">AWAITING TRANSMISSION</div>
               <pre class="out" id="rxOut"></pre>
               <div class="btnrow">
                 <button
@@ -3933,12 +3957,23 @@ NO FRAME RECEIVED YET</pre
         // shared SIGNAL MONITOR panel shows the spectrum of what's playing.
         let txMon = null;
 
-        // TX step LEDs + latching SENT/ABRT annunciator
+        // TX step LEDs + latching SENT/ABRT annunciator. During playback the
+        // phase is derived from the playhead: the frame layout is fully known.
+        const TX_LEDS = {
+          ready: "ledReady",
+          carrier: "ledTxCarrier",
+          header: "ledTxHeader",
+          payload: "ledTxPayload",
+        };
+        let txLedState = "ready";
+        let txPhases = null; // { header, payload } in seconds from playback start
         function setTxLeds(state) {
-          $("ledReady").classList.toggle("on", state === "ready");
-          $("ledEncode").classList.toggle("on", state === "encode");
-          $("ledOnAir").classList.toggle("on", state === "onair");
-          $("ledOnAir").classList.toggle("blink", state === "onair");
+          txLedState = state;
+          for (const k in TX_LEDS) {
+            const el = $(TX_LEDS[k]);
+            el.classList.toggle("on", k === state);
+            el.classList.toggle("blink", k === state && k !== "ready");
+          }
         }
         function setTxResult(kind) {
           $("annTx").classList.toggle("ok", kind === "ok");
@@ -3968,7 +4003,8 @@ NO FRAME RECEIVED YET</pre
           if (aborted) log("transmission aborted", "r");
         }
 
-        function playSignal(sig, p) {
+        function playSignal(sig, p, phases) {
+          txPhases = phases || null;
           const c = ensureCtx();
           const buf = c.createBuffer(1, sig.length, c.sampleRate);
           buf.getChannelData(0).set(sig);
@@ -3990,7 +4026,7 @@ NO FRAME RECEIVED YET</pre
             pow: new Float32Array(p.fftSize >> 1),
           };
           if (!listening) $("monTag").textContent = "SPKR OUT";
-          setTxLeds("onair");
+          setTxLeds("carrier");
           $("txSend").textContent = "■ ABORT";
           $("txSend").classList.remove("arm");
           $("txSend").classList.add("danger");
@@ -4014,6 +4050,16 @@ NO FRAME RECEIVED YET</pre
           $("txCap").style.left = pct;
           $("txTime").textContent =
             t.toFixed(1) + " / " + txDurSec.toFixed(1) + " s";
+          // step LEDs track which part of the frame is currently on air
+          if (txPhases) {
+            const st =
+              t < txPhases.header
+                ? "carrier"
+                : t < txPhases.payload
+                  ? "header"
+                  : "payload";
+            if (st !== txLedState) setTxLeds(st);
+          }
           // drive the shared monitor from the outgoing samples (the mic owns
           // the monitor whenever the receiver is listening)
           if (txMon && !listening) {
@@ -4050,7 +4096,6 @@ NO FRAME RECEIVED YET</pre
           if (!payload.length || payload.length > AirGap.MAX_PAYLOAD) return;
           const c = ensureCtx();
           await c.resume(); // iOS: must resume inside the gesture
-          setTxLeds("encode");
           setTxResult(null);
           log(
             "modulating " +
@@ -4116,7 +4161,13 @@ NO FRAME RECEIVED YET</pre
             " Hz\n\n" +
             hexPreview(payload);
           log("on air · " + fmtSecs(sig.length / c.sampleRate), "a");
-          playSignal(sig, p);
+          // frame phase boundaries (seconds from playback start) for the LEDs
+          const symSec = p.symbolLen / c.sampleRate;
+          const lead = 0.3; // silence before the preamble
+          playSignal(sig, p, {
+            header: lead + (AirGap.PREAMBLE_SYMS + 1) * symSec,
+            payload: lead + (AirGap.PREAMBLE_SYMS + 1 + 24) * symSec,
+          });
         }
         on("txSend", "click", () => (txPlaying ? stopTx(true) : transmit()));
 
@@ -4228,8 +4279,6 @@ registerProcessor('airgap-capture', AirgapCapture);`;
                 $("rxOut").classList.remove("err"); // new frame resets error state
                 $("rxOut").classList.add("raw");
                 $("rxOut").textContent = "▌";
-                $("rxMeta").textContent =
-                  "RECEIVING — LIVE RAW STREAM (FEC NOT YET APPLIED)";
               }
               if (s !== "PAYLOAD" && s !== "HEADER") {
                 rxGot = 0;
@@ -4275,16 +4324,9 @@ registerProcessor('airgap-capture', AirgapCapture);`;
                       r.payload.length +
                       " bytes]\n" +
                       hexPreview(r.payload);
-                $("rxMeta").textContent =
-                  "RECEIVED " +
-                  fmtBytes(r.payload.length) +
-                  (lastResultText !== null ? " UTF-8 TEXT" : " BINARY") +
-                  " · RS CORRECTED " +
-                  r.stats.corrected +
-                  " B" +
-                  " · CONF MIN " +
-                  r.stats.minConfDb.toFixed(1) +
-                  " dB";
+                $("rxFmt").textContent =
+                  lastResultText !== null ? "UTF-8" : "BINARY";
+                $("rxFix").textContent = r.stats.corrected + " B";
                 $("rxCopy").disabled = lastResultText === null;
                 $("rxSave").disabled = false;
                 setResult("ok");
@@ -4339,7 +4381,6 @@ registerProcessor('airgap-capture', AirgapCapture);`;
                       " B ─\n" +
                       previewText(liveBuf.subarray(0, liveN))
                     : "");
-                $("rxMeta").textContent = "DECODE FAILED";
                 setResult("err");
                 $("rxDump").textContent =
                   "── LAST RX FRAME · " +
@@ -4409,11 +4450,12 @@ registerProcessor('airgap-capture', AirgapCapture);`;
           if ($("rxOut").classList.contains("err")) {
             $("rxOut").classList.remove("err");
             $("rxOut").textContent = "";
-            $("rxMeta").textContent = "AWAITING TRANSMISSION";
           }
           $("rxBytes").textContent = "—";
           $("rxDur").textContent = "—";
           $("rxRate").textContent = "—";
+          $("rxFmt").textContent = "—";
+          $("rxFix").textContent = "—";
           setResult(null);
           if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             micFail("MICROPHONE API UNAVAILABLE — use HTTPS or localhost");
@@ -4526,7 +4568,6 @@ registerProcessor('airgap-capture', AirgapCapture);`;
           $("rxOut").classList.remove("raw");
           $("rxOut").classList.add("err");
           $("rxOut").textContent = msg;
-          $("rxMeta").textContent = "MICROPHONE ERROR";
           log("mic error: " + msg, "r");
         }
 
