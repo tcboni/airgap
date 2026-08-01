@@ -737,7 +737,7 @@
         background: #0a0d08;
         border: 1px solid var(--seam);
         border-radius: 4px;
-        padding: 8px 10px;
+        padding: 10px;
         box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.7);
       }
       .ro .k {
@@ -759,8 +759,9 @@
 
       /* text input */
       textarea {
+        display: block;
         width: 100%;
-        min-height: 220px; /* matches the receive output area */
+        min-height: 250px; /* matches the receive output area */
         resize: none;
         background: #0a0d08;
         color: var(--ink);
@@ -867,9 +868,6 @@
       }
 
       /* output */
-      .outwrap {
-        margin-top: 14px;
-      }
       pre.out {
         background: #0a0d08;
         border: 1px solid var(--seam);
@@ -887,7 +885,7 @@
       }
       /* the received message is the receiver's main deliverable — keep it big */
       #rxOut {
-        min-height: 220px;
+        min-height: 250px;
         max-height: 360px;
       }
       /* live raw stream: unverified bytes render amber until FEC + CRC pass */
@@ -1334,24 +1332,22 @@ Hello across the air gap 📡</textarea
               </div>
             </div>
 
-            <div class="outwrap">
-              <pre class="out" id="rxOut"></pre>
-              <div class="btnrow">
-                <button
-                  id="rxCopy"
-                  disabled
-                  data-tip="Copy the decoded UTF-8 text to the clipboard. Disabled when the payload isn't valid text."
-                >
-                  ⧉ COPY TEXT
-                </button>
-              </div>
-              <div
-                class="trackrow"
-                data-tip="SYM = payload progress in symbols: received / expected. Each byte takes two symbols (one per 4-bit nibble), including FEC parity bytes."
+            <pre class="out" id="rxOut"></pre>
+            <div class="btnrow">
+              <button
+                id="rxCopy"
+                disabled
+                data-tip="Copy the decoded UTF-8 text to the clipboard. Disabled when the payload isn't valid text."
               >
-                <div class="track"><div class="fill" id="rxFill"></div></div>
-                <div class="t" id="rxSym">SYM —/—</div>
-              </div>
+                ⧉ COPY TEXT
+              </button>
+            </div>
+            <div
+              class="trackrow"
+              data-tip="SYM = payload progress in symbols: received / expected. Each byte takes two symbols (one per 4-bit nibble), including FEC parity bytes."
+            >
+              <div class="track"><div class="fill" id="rxFill"></div></div>
+              <div class="t" id="rxSym">SYM —/—</div>
             </div>
           </section>
         </div>
@@ -2511,7 +2507,11 @@ NO FRAME RECEIVED YET</pre
               len > MAX_PAYLOAD
             )
               return null;
-            return { len, parity: FEC_FROM_CODE[fecCode], corrected: dec.corrected };
+            return {
+              len,
+              parity: FEC_FROM_CODE[fecCode],
+              corrected: dec.corrected,
+            };
           }
 
           _finishHeader() {
@@ -2539,8 +2539,7 @@ NO FRAME RECEIVED YET</pre
               const lastC = this.hdrStart + 23 * P.symbolLen + off;
               if (lastC + half + 1 > this.total) return false; // wait for audio
               this.retryIdx++;
-              if (this.hdrStart + off - half < this.total - this.cap)
-                continue; // start of header already overwritten in the ring
+              if (this.hdrStart + off - half < this.total - this.cap) continue; // start of header already overwritten in the ring
               const nibs = [],
                 confs = [];
               for (let k = 0; k < 24; k++) {
@@ -4139,13 +4138,15 @@ NO FRAME RECEIVED YET</pre
             const m = txMon,
               N = m.p.fftSize;
             const pos = Math.floor(t * ctx.sampleRate);
-            const start = Math.max(0, Math.min(pos - (N >> 1), m.sig.length - N));
+            const start = Math.max(
+              0,
+              Math.min(pos - (N >> 1), m.sig.length - N),
+            );
             // Normalize by the Hann coherent gain (N/4) so a full-scale tone
             // lands near the top of the scope instead of clipping far above it
             // (synth samples are ~1.0; mic samples the scope was scaled for
             // are much smaller). The extra 0.05 leaves visible headroom.
-            const norm =
-              (0.05 * txVolume * txVolume) / Math.pow(N / 4, 2);
+            const norm = (0.05 * txVolume * txVolume) / Math.pow(N / 4, 2);
             for (let n = 0; n < N; n++) {
               m.re[n] = m.sig[start + n] * m.win[n];
               m.im[n] = 0;
@@ -4646,8 +4647,9 @@ registerProcessor('airgap-capture', AirgapCapture);`;
             Math.max(0, Math.min(100, ((rmsDb + 60) / 60) * 100)) + "%";
           $("lvlTxt").textContent =
             (rmsDb <= -99 ? "−∞" : rmsDb.toFixed(0)) + " dB";
-          $("cnfFill").style.width =
-            confDb ? Math.max(0, Math.min(100, (confDb / 30) * 100)) + "%" : "0%";
+          $("cnfFill").style.width = confDb
+            ? Math.max(0, Math.min(100, (confDb / 30) * 100)) + "%"
+            : "0%";
           $("cnfTxt").textContent = confDb ? confDb.toFixed(1) + " dB" : "— dB";
         }
 
