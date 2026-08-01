@@ -521,7 +521,10 @@
         color: var(--faint);
       }
       .pushsw button.pressed {
-        transform: translateY(2px);
+        /* offset via top, not transform — a transform would create a stacking
+           context and trap the tooltip bubble beneath sibling elements */
+        position: relative;
+        top: 2px;
         background: linear-gradient(180deg, #181c11, #10130a);
         border-color: #6b5417; /* lit amber outline, keeps the bottom edge */
         border-bottom-width: 1px;
@@ -560,7 +563,8 @@
         padding: 2px 10px; /* inset the bar from the panel edges */
       }
       .autobar.pressed {
-        transform: translateY(2px);
+        position: relative; /* top offset, not transform — see .pushsw note */
+        top: 2px;
         background: linear-gradient(180deg, #0e2415, #09190e);
         border-bottom-width: 1px;
         border-color: var(--green-dim);
@@ -654,8 +658,8 @@
       .ann b {
         display: block;
         width: 56px;
-        height: 28px;
-        line-height: 28px;
+        height: 42px;
+        line-height: 42px;
         margin: 0 auto;
         font-size: 11px;
         font-weight: 400;
@@ -881,6 +885,13 @@
       pre.out.raw {
         color: var(--amber);
         text-shadow: 0 0 6px rgba(255, 176, 32, 0.25);
+      }
+      /* decode/mic errors take over the output box until the next frame */
+      pre.out.err {
+        color: var(--red);
+        text-shadow: 0 0 6px rgba(255, 80, 64, 0.25);
+        border-color: #7a2a24;
+        background: rgba(255, 80, 64, 0.04);
       }
       /* frame inspector dumps (diagnostics) */
       .inspwrap {
@@ -1251,9 +1262,9 @@ Hello across the air gap 📡</textarea
               <div
                 class="led ann"
                 id="annResult"
-                data-tip="Outcome of the last frame — OK (decoded, CRC-32 verified) or ERR (failed; the message below says at which stage). One lamp because they're mutually exclusive. Latches until the next transmission starts."
+                data-tip="Outcome of the last frame — OK (decoded, CRC-32 verified) or ERR (failed; the message below says at which stage)."
               >
-                <b id="annTxt">—</b><span>RESULT</span>
+                <b id="annTxt">—</b>
               </div>
             </div>
 
@@ -1291,11 +1302,6 @@ Hello across the air gap 📡</textarea
                 <div class="track"><div class="fill" id="rxFill"></div></div>
                 <div class="t" id="rxSym">SYM —/—</div>
               </div>
-              <div
-                class="errbox"
-                id="rxErr"
-                data-tip="Sticky: the last error stays here until a frame decodes successfully or you restart listening."
-              ></div>
             </div>
 
             <div class="subdiv">SIGNAL MONITOR</div>
@@ -1344,78 +1350,78 @@ Hello across the air gap 📡</textarea
                 </button>
               </div>
               <div class="deckrow">
-              <div
-                class="knobunit"
-                data-tip="Carrier band for the 16 data tones. Press to switch — the buttons latch like a real radio. Both devices must be set to the same band (or enable AUTO on the receiver). Ultrasonic is near-silent to most adults but needs decent speakers and mics — many phones roll off above 18 kHz."
-              >
-                <div class="klabel">BAND</div>
-                <div class="pushsw" role="radiogroup" aria-label="Band">
-                  <button
-                    id="bandAud"
-                    class="pressed"
-                    role="radio"
-                    aria-checked="true"
-                  >
-                    AUD<small>1.9–5.1 kHz</small>
-                  </button>
-                  <button id="bandUlt" role="radio" aria-checked="false">
-                    ULTRA<small>16–19 kHz</small>
-                  </button>
+                <div
+                  class="knobunit"
+                  data-tip="Carrier band for the 16 data tones. Press to switch — the buttons latch like a real radio. Both devices must be set to the same band (or enable AUTO on the receiver). Ultrasonic is near-silent to most adults but needs decent speakers and mics — many phones roll off above 18 kHz."
+                >
+                  <div class="klabel">BAND</div>
+                  <div class="pushsw" role="radiogroup" aria-label="Band">
+                    <button
+                      id="bandAud"
+                      class="pressed"
+                      role="radio"
+                      aria-checked="true"
+                    >
+                      AUD<small>1.9–5.1 kHz</small>
+                    </button>
+                    <button id="bandUlt" role="radio" aria-checked="false">
+                      ULTRA<small>16–19 kHz</small>
+                    </button>
+                  </div>
+                  <div class="kvalue" id="bandVal">AUDIBLE</div>
                 </div>
-                <div class="kvalue" id="bandVal">AUDIBLE</div>
-              </div>
-              <div
-                class="knobunit"
-                data-tip="Channel plan: shifts the whole tone set so two device pairs can transmit in the same room without colliding. A = 1.9 kHz base, B = +3.8 kHz, C = +7.6 kHz. Must match on both ends. The ultrasonic band has no spare spectrum below Nyquist, so it is single-channel there."
-              >
-                <div class="klabel">CHANNEL</div>
-                <div class="pushsw" role="radiogroup" aria-label="Channel">
-                  <button
-                    id="chA"
-                    class="pressed"
-                    role="radio"
-                    aria-checked="true"
-                  >
-                    A<small>1.9k</small>
-                  </button>
-                  <button id="chB" role="radio" aria-checked="false">
-                    B<small>5.7k</small>
-                  </button>
-                  <button id="chC" role="radio" aria-checked="false">
-                    C<small>9.5k</small>
-                  </button>
+                <div
+                  class="knobunit"
+                  data-tip="Channel plan: shifts the whole tone set so two device pairs can transmit in the same room without colliding. A = 1.9 kHz base, B = +3.8 kHz, C = +7.6 kHz. Must match on both ends. The ultrasonic band has no spare spectrum below Nyquist, so it is single-channel there."
+                >
+                  <div class="klabel">CHANNEL</div>
+                  <div class="pushsw" role="radiogroup" aria-label="Channel">
+                    <button
+                      id="chA"
+                      class="pressed"
+                      role="radio"
+                      aria-checked="true"
+                    >
+                      A<small>1.9k</small>
+                    </button>
+                    <button id="chB" role="radio" aria-checked="false">
+                      B<small>5.7k</small>
+                    </button>
+                    <button id="chC" role="radio" aria-checked="false">
+                      C<small>9.5k</small>
+                    </button>
+                  </div>
+                  <div class="kvalue" id="chVal">A · 1.9 kHz</div>
                 </div>
-                <div class="kvalue" id="chVal">A · 1.9 kHz</div>
-              </div>
               </div>
               <div class="deckrow">
-              <div
-                class="knobunit"
-                id="spdUnit"
-                data-tip="Symbol duration — the speed vs. robustness trade-off. 1× = 90 ms symbols, 1.5× = 60 ms, 2.25× = 40 ms, 3× = 30 ms. Faster symbols carry less energy, so less range and noise margin — 3× wants close range and a quiet room. Click or drag to aim. Both devices must use the same speed (or enable AUTO on the receiver)."
-              >
-                <div class="klabel">SPEED</div>
-                <div id="knobSpeed"></div>
-                <div class="kvalue" id="spdVal">FAST 1.5x</div>
-              </div>
-              <div
-                class="knobunit"
-                id="fecUnit"
-                data-tip="Forward error correction strength: Reed-Solomon parity bytes per 223-byte block. LOW = 8 (repairs up to 4 corrupted bytes per block), MED = 16 (repairs 8), HIGH = 32 (repairs 16). More parity means longer airtime but a much tougher signal. Transmit-side setting — the receiver reads it from the frame header automatically."
-              >
-                <div class="klabel">FEC</div>
-                <div id="knobFec"></div>
-                <div class="kvalue" id="fecVal">HIGH · ±16 B</div>
-              </div>
-              <div
-                class="knobunit"
-                id="volUnit"
-                data-tip="Speaker output volume. Default 80% — turn the device's own volume up and lower this only if the receiver's LVL meter stays pinned at max (clipping). Click or drag to aim, arrow keys when focused. Local setting — no need to match. Disabled while receiving."
-              >
-                <div class="klabel">VOLUME</div>
-                <div id="knobVol"></div>
-                <div class="kvalue" id="volVal">80%</div>
-              </div>
+                <div
+                  class="knobunit"
+                  id="spdUnit"
+                  data-tip="Symbol duration — the speed vs. robustness trade-off. 1× = 90 ms symbols, 1.5× = 60 ms, 2.25× = 40 ms, 3× = 30 ms. Faster symbols carry less energy, so less range and noise margin — 3× wants close range and a quiet room. Click or drag to aim. Both devices must use the same speed (or enable AUTO on the receiver)."
+                >
+                  <div class="klabel">SPEED</div>
+                  <div id="knobSpeed"></div>
+                  <div class="kvalue" id="spdVal">FAST 1.5x</div>
+                </div>
+                <div
+                  class="knobunit"
+                  id="fecUnit"
+                  data-tip="Forward error correction strength: Reed-Solomon parity bytes per 223-byte block. LOW = 8 (repairs up to 4 corrupted bytes per block), MED = 16 (repairs 8), HIGH = 32 (repairs 16). More parity means longer airtime but a much tougher signal. Transmit-side setting — the receiver reads it from the frame header automatically."
+                >
+                  <div class="klabel">FEC</div>
+                  <div id="knobFec"></div>
+                  <div class="kvalue" id="fecVal">HIGH · ±16 B</div>
+                </div>
+                <div
+                  class="knobunit"
+                  id="volUnit"
+                  data-tip="Speaker output volume. Default 80% — turn the device's own volume up and lower this only if the receiver's LVL meter stays pinned at max (clipping). Click or drag to aim, arrow keys when focused. Local setting — no need to match. Disabled while receiving."
+                >
+                  <div class="klabel">VOLUME</div>
+                  <div id="knobVol"></div>
+                  <div class="kvalue" id="volVal">80%</div>
+                </div>
               </div>
             </div>
           </section>
@@ -1496,8 +1502,7 @@ NO FRAME RECEIVED YET</pre
         <b>FIELD MANUAL:</b> HOLD DEVICES 30 CM – 1 M APART · RAISE VOLUME ·
         QUIET ROOM HELPS<br />
         MATCH BAND · CHANNEL · SPEED ON BOTH ENDS — OR PRESS AUTO ON THE
-        RECEIVER · ULTRASONIC IS HARDWARE-DEPENDENT · HOVER ANY CONTROL FOR
-        HELP
+        RECEIVER · ULTRASONIC IS HARDWARE-DEPENDENT · HOVER ANY CONTROL FOR HELP
       </div>
       <footer>
         SINGLE FILE · WORKS OFFLINE · ADD ?selftest TO URL FOR FULL DIAGNOSTIC
@@ -2548,10 +2553,7 @@ NO FRAME RECEIVED YET</pre
               this.innerIdle += n;
               // nothing decoding for a while: go back to wide-band scanning
               if (this.innerIdle > this.fs * 2.5 || this.dropAfterResult) {
-                if (
-                  this.dropAfterResult ||
-                  this.inner.state === "LISTENING"
-                ) {
+                if (this.dropAfterResult || this.inner.state === "LISTENING") {
                   this.inner = null;
                   this.dropAfterResult = false;
                   this.detected = null;
@@ -3312,7 +3314,9 @@ NO FRAME RECEIVED YET</pre
           return (v >>> 0).toString(16).padStart(8, "0").toUpperCase();
         }
         function hexBytes(b) {
-          return Array.from(b, (x) => x.toString(16).padStart(2, "0")).join(" ");
+          return Array.from(b, (x) => x.toString(16).padStart(2, "0")).join(
+            " ",
+          );
         }
         function linkDesc(profile, ch, speed, parity) {
           return (
@@ -3629,7 +3633,8 @@ NO FRAME RECEIVED YET</pre
         function setChannel(i) {
           channelIdx = i;
           refreshChannelUi();
-          if (!restoring) log("channel " + "ABC"[i] + " (" + CH_LABELS[i] + ")");
+          if (!restoring)
+            log("channel " + "ABC"[i] + " (" + CH_LABELS[i] + ")");
           updateFsInfo();
           if (listening) restartDemod();
           saveState();
@@ -3915,20 +3920,47 @@ NO FRAME RECEIVED YET</pre
           const frame = AirGap.encodeFrame(payload, p.parity);
           const nblocks = Math.ceil((payload.length + 4) / AirGap.RS_DATA);
           $("txDump").textContent =
-            "── LAST TX FRAME · " + now() + "\n" +
-            "LINK     " + linkDesc(profileName, channelIdx, speedName, p.parity) + "\n" +
-            "TONES    " + p.dataFreqs[0].toFixed(0) + "–" +
-            p.dataFreqs[15].toFixed(0) + " Hz · MARKERS " + p.fp0.toFixed(0) +
-            " / " + p.fp1.toFixed(0) + " Hz\n" +
-            "PAYLOAD  " + payload.length + " B · CRC-32 " +
-            hex8(AirGap.crc32(payload)) + "\n" +
-            "HEADER   " + hexBytes(frame.header.subarray(0, 4)) + "  + RS  " +
-            hexBytes(frame.header.subarray(4)) + "\n" +
-            "BODY     " + nblocks + " RS block(s) · " + frame.body.length +
-            " B on wire (4 B CRC-32 + " + nblocks * p.parity + " B parity)\n" +
-            "FRAME    " + AirGap.totalSymbolsFor(payload.length, p.parity) +
-            " symbols · " + fmtSecs(sig.length / c.sampleRate) + " · " +
-            sig.length + " samples @ " + c.sampleRate + " Hz\n\n" +
+            "── LAST TX FRAME · " +
+            now() +
+            "\n" +
+            "LINK     " +
+            linkDesc(profileName, channelIdx, speedName, p.parity) +
+            "\n" +
+            "TONES    " +
+            p.dataFreqs[0].toFixed(0) +
+            "–" +
+            p.dataFreqs[15].toFixed(0) +
+            " Hz · MARKERS " +
+            p.fp0.toFixed(0) +
+            " / " +
+            p.fp1.toFixed(0) +
+            " Hz\n" +
+            "PAYLOAD  " +
+            payload.length +
+            " B · CRC-32 " +
+            hex8(AirGap.crc32(payload)) +
+            "\n" +
+            "HEADER   " +
+            hexBytes(frame.header.subarray(0, 4)) +
+            "  + RS  " +
+            hexBytes(frame.header.subarray(4)) +
+            "\n" +
+            "BODY     " +
+            nblocks +
+            " RS block(s) · " +
+            frame.body.length +
+            " B on wire (4 B CRC-32 + " +
+            nblocks * p.parity +
+            " B parity)\n" +
+            "FRAME    " +
+            AirGap.totalSymbolsFor(payload.length, p.parity) +
+            " symbols · " +
+            fmtSecs(sig.length / c.sampleRate) +
+            " · " +
+            sig.length +
+            " samples @ " +
+            c.sampleRate +
+            " Hz\n\n" +
             hexPreview(payload);
           log("on air · " + fmtSecs(sig.length / c.sampleRate), "a");
           playSignal(sig);
@@ -4029,6 +4061,7 @@ registerProcessor('airgap-capture', AirgapCapture);`;
                 );
                 liveBuf = new Uint8Array(demod.payloadLen);
                 liveN = 0;
+                $("rxOut").classList.remove("err"); // new frame resets error state
                 $("rxOut").classList.add("raw");
                 $("rxOut").textContent = "▌";
                 $("rxMeta").textContent =
@@ -4070,7 +4103,7 @@ registerProcessor('airgap-capture', AirgapCapture);`;
                     fatal: true,
                   }).decode(r.payload);
                 } catch (e) {}
-                $("rxOut").classList.remove("raw"); // verified: amber raw becomes green
+                $("rxOut").classList.remove("raw", "err"); // verified: green
                 $("rxOut").textContent =
                   lastResultText !== null
                     ? lastResultText
@@ -4090,19 +4123,32 @@ registerProcessor('airgap-capture', AirgapCapture);`;
                   " dB";
                 $("rxCopy").disabled = lastResultText === null;
                 $("rxSave").disabled = false;
-                $("rxErr").classList.remove("show"); // a success clears the sticky error
                 setResult("ok");
                 $("rxDump").textContent =
-                  "── LAST RX FRAME · " + now() + " · OK\n" +
-                  "LINK     " + rxLinkDesc() + "\n" +
-                  "HEADER   LEN " + r.payload.length + " B · FEC " +
-                  demod.rxParity + " (from header) · CRC-16 OK\n" +
-                  "FEC      " + r.stats.corrected +
+                  "── LAST RX FRAME · " +
+                  now() +
+                  " · OK\n" +
+                  "LINK     " +
+                  rxLinkDesc() +
+                  "\n" +
+                  "HEADER   LEN " +
+                  r.payload.length +
+                  " B · FEC " +
+                  demod.rxParity +
+                  " (from header) · CRC-16 OK\n" +
+                  "FEC      " +
+                  r.stats.corrected +
                   " byte(s) corrected by Reed-Solomon\n" +
-                  "SIGNAL   conf min " + r.stats.minConfDb.toFixed(1) +
-                  " dB · avg " + r.stats.avgConfDb.toFixed(1) + " dB · " +
-                  r.stats.symbols + " data symbols\n" +
-                  "CRC-32   " + hex8(AirGap.crc32(r.payload)) + " VERIFIED\n\n" +
+                  "SIGNAL   conf min " +
+                  r.stats.minConfDb.toFixed(1) +
+                  " dB · avg " +
+                  r.stats.avgConfDb.toFixed(1) +
+                  " dB · " +
+                  r.stats.symbols +
+                  " data symbols\n" +
+                  "CRC-32   " +
+                  hex8(AirGap.crc32(r.payload)) +
+                  " VERIFIED\n\n" +
                   hexPreview(r.payload);
                 log(
                   "✓ payload received · " +
@@ -4113,26 +4159,36 @@ registerProcessor('airgap-capture', AirgapCapture);`;
                   "g",
                 );
               } else {
-                if (liveBuf && liveN) {
-                  // keep the partial raw stream visible, minus cursor
-                  $("rxOut").textContent = previewText(
-                    liveBuf.subarray(0, liveN),
-                  );
-                  $("rxMeta").textContent =
-                    "DECODE FAILED — SHOWING UNVERIFIED RAW STREAM (" +
-                    liveN +
-                    " B)";
-                }
-                $("rxErr").textContent =
-                  "LAST ERROR " + now() + " — " + (ERRORS[r.error] || r.error);
-                $("rxErr").classList.add("show");
+                // the error takes over the output box (red) until the next
+                // frame starts or a decode succeeds; partial raw bytes stay
+                // visible beneath it
+                $("rxOut").classList.remove("raw");
+                $("rxOut").classList.add("err");
+                $("rxOut").textContent =
+                  "LAST ERROR " +
+                  now() +
+                  "\n" +
+                  (ERRORS[r.error] || r.error) +
+                  (liveBuf && liveN
+                    ? "\n\n─ UNVERIFIED RAW STREAM · " +
+                      liveN +
+                      " B ─\n" +
+                      previewText(liveBuf.subarray(0, liveN))
+                    : "");
+                $("rxMeta").textContent = "DECODE FAILED";
                 setResult("err");
                 $("rxDump").textContent =
-                  "── LAST RX FRAME · " + now() + " · FAILED\n" +
-                  "LINK     " + rxLinkDesc() + "\n" +
-                  "ERROR    " + (ERRORS[r.error] || r.error) +
+                  "── LAST RX FRAME · " +
+                  now() +
+                  " · FAILED\n" +
+                  "LINK     " +
+                  rxLinkDesc() +
+                  "\n" +
+                  "ERROR    " +
+                  (ERRORS[r.error] || r.error) +
                   (liveBuf && liveN
-                    ? "\nRAW      " + liveN +
+                    ? "\nRAW      " +
+                      liveN +
                       " unverified byte(s) streamed before failure\n\n" +
                       hexPreview(liveBuf.subarray(0, liveN))
                     : "");
@@ -4185,7 +4241,12 @@ registerProcessor('airgap-capture', AirgapCapture);`;
         async function startListening() {
           const c = ensureCtx();
           await c.resume();
-          $("rxErr").classList.remove("show");
+          // a fresh session clears any error still shown in the output box
+          if ($("rxOut").classList.contains("err")) {
+            $("rxOut").classList.remove("err");
+            $("rxOut").textContent = "";
+            $("rxMeta").textContent = "AWAITING TRANSMISSION";
+          }
           setResult(null);
           if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             micFail("MICROPHONE API UNAVAILABLE — use HTTPS or localhost");
@@ -4292,8 +4353,10 @@ registerProcessor('airgap-capture', AirgapCapture);`;
         );
 
         function micFail(msg) {
-          $("rxErr").textContent = msg;
-          $("rxErr").classList.add("show");
+          $("rxOut").classList.remove("raw");
+          $("rxOut").classList.add("err");
+          $("rxOut").textContent = msg;
+          $("rxMeta").textContent = "MICROPHONE ERROR";
           log("mic error: " + msg, "r");
         }
 
