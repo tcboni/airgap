@@ -117,12 +117,32 @@ button.danger { color: var(--red); border-color: #7a2a24; }
 .rocker button.sel-tx { background: linear-gradient(180deg, #2b2107, #1d1605); color: var(--amber); text-shadow: 0 0 12px rgba(255,176,32,.6); }
 .rocker button.sel-rx { background: linear-gradient(180deg, #0c2a17, #081d10); color: var(--green); text-shadow: 0 0 12px rgba(92,240,140,.6); }
 
-/* profile switch */
-.profrow { display:flex; align-items:center; gap:10px; justify-content:center; margin-top:10px; font-size:10px; letter-spacing:.18em; color:var(--dim); flex-wrap: wrap;}
-.profsw { display:inline-flex; border:1px solid var(--seam-hi); border-radius:4px; overflow:hidden; }
-.profsw button { border:0; border-radius:0; box-shadow:none; padding:5px 12px; font-size:10px; color:var(--dim); background:#12150e; }
-.profsw button + button { border-left:1px solid var(--seam-hi); }
-.profsw button.sel { color:var(--amber); background:#241c08; }
+/* ---- control deck: rotary knobs ---- */
+.deck { display:flex; gap:8px 28px; align-items:center; flex-wrap:wrap; justify-content:center; }
+.knobunit { text-align:center; user-select:none; -webkit-user-select:none; }
+.klabel { font-size:9px; letter-spacing:.24em; color:var(--faint); }
+.kvalue { font-size:11px; color:var(--amber); letter-spacing:.12em; min-height:16px;
+  text-shadow:0 0 8px rgba(255,176,32,.3); }
+.knob { position:relative; width:128px; height:124px; margin:0 auto; touch-action:none; cursor:pointer; outline:none; }
+.knob:focus-visible { border-radius:50%; box-shadow:0 0 0 1px var(--amber-dim); }
+.knob .kface { position:absolute; left:50%; top:50%; width:76px; height:76px; transform:translate(-50%,-50%);
+  border-radius:50%; background: radial-gradient(circle at 38% 30%, #1b2016, #0a0c08 72%);
+  border:2px solid #262b22;
+  box-shadow: inset 0 2px 8px rgba(0,0,0,.8), 0 3px 5px #000, 0 1px 0 rgba(255,255,255,.05); }
+.knob i { position:absolute; left:50%; top:50%; width:1px; height:5px; background:#3a4234; }
+.knob i.major { width:2px; height:9px; background:#6d6a5c; }
+.knob i.major.lit { background:var(--amber); box-shadow:0 0 7px var(--amber); }
+.knob b { position:absolute; left:50%; top:50%; font-size:9px; font-weight:400; letter-spacing:.06em;
+  color:var(--faint); white-space:nowrap; }
+.knob b.lit { color:var(--amber); text-shadow:0 0 6px rgba(255,176,32,.5); }
+.kptrwrap { position:absolute; inset:0; transform: rotate(var(--angle,0deg));
+  transition: transform .16s cubic-bezier(.3,1.6,.5,1); pointer-events:none; }
+.kptr { position:absolute; left:calc(50% - 1.5px); top:26px; width:3px; height:21px; border-radius:2px;
+  background: var(--amber); box-shadow: 0 0 8px rgba(255,176,32,.7); }
+.khub { position:absolute; left:50%; top:50%; width:9px; height:9px; transform:translate(-50%,-50%);
+  border-radius:50%; background: radial-gradient(circle at 35% 30%, #e8e2d0, #857f70 72%);
+  box-shadow: 0 1px 2px #000; pointer-events:none; }
+.deckro { display:flex; flex-direction:column; gap:10px; justify-content:center; flex:0 1 190px; min-width:150px; }
 
 /* LEDs */
 .ledrow { display: flex; gap: 4%; justify-content: space-between; margin: 4px 0 16px; }
@@ -138,6 +158,15 @@ button.danger { color: var(--red); border-color: #7a2a24; }
 .led.on.r i { background: var(--red); box-shadow: 0 0 10px var(--red), 0 0 3px var(--red), inset 0 0 3px rgba(255,255,255,.7); }
 .led.blink i { animation: blink 1s steps(2) infinite; }
 @keyframes blink { 50% { filter: brightness(.35); } }
+
+/* RESULT annunciator: one lamp, mutually exclusive OK / ERR */
+.ann b { display:block; width:48px; height:15px; line-height:15px; margin:0 auto 5px;
+  font-size:9px; font-weight:400; letter-spacing:.2em; text-indent:.2em; border-radius:2px;
+  background:#1c1f1a; color:#3d4038; border:1px solid #000; box-shadow: inset 0 1px 3px #000; }
+.ann.ok b { background:#0d2c1a; color:var(--green); border-color:var(--green-dim);
+  box-shadow: 0 0 12px rgba(92,240,140,.35), inset 0 0 5px rgba(92,240,140,.25); }
+.ann.err b { background:#331210; color:var(--red); border-color:#7a2a24;
+  box-shadow: 0 0 12px rgba(255,80,64,.35), inset 0 0 5px rgba(255,80,64,.25); }
 
 /* readouts */
 .readouts { display:flex; gap:10px; flex-wrap:wrap; margin: 12px 0; }
@@ -201,6 +230,8 @@ pre.out {
   color: var(--green); text-shadow: 0 0 6px rgba(92,240,140,.25); font-size: 13px;
   box-shadow: inset 0 2px 8px rgba(0,0,0,.7);
 }
+/* live raw stream: unverified bytes render amber until FEC + CRC pass */
+pre.out.raw { color: var(--amber); text-shadow: 0 0 6px rgba(255,176,32,.25); }
 .outmeta { font-size:10px; letter-spacing:.12em; color:var(--dim); margin:6px 0; }
 .btnrow { display:flex; gap:10px; margin-top:8px; flex-wrap:wrap; }
 .btnrow button { flex:1 1 120px; }
@@ -225,6 +256,42 @@ pre.out {
 .badge.ok { color:var(--green); border:1px solid var(--green-dim); }
 .badge.bad { color:var(--red); border:1px solid #7a2a24; }
 
+/* ---- tooltips: CSS-only, via CSS anchor positioning (no JS) ---- */
+[data-tip] { cursor: help; }
+button[data-tip] { cursor: pointer; }
+[data-tip]::after {
+  content: attr(data-tip);
+  position: fixed;
+  position-area: block-start;            /* anchored to the hovered element */
+  position-try-fallbacks: flip-block, flip-inline;
+  margin: 8px;
+  width: max-content;
+  max-width: min(68vw, 300px);
+  background: #10130d;
+  border: 1px solid var(--amber-dim);
+  border-radius: 3px;
+  padding: 7px 10px;
+  font-family: var(--mono);
+  font-size: 11px; font-weight: 400; line-height: 1.5;
+  letter-spacing: .02em; text-transform: none; text-align: left; text-shadow: none;
+  color: var(--ink); white-space: normal;
+  box-shadow: 0 8px 20px rgba(0,0,0,.65), 0 0 12px rgba(255,176,32,.08);
+  opacity: 0; visibility: hidden;
+  transition: opacity .15s ease .4s, visibility 0s linear .4s;
+  pointer-events: none;
+  z-index: 90;
+}
+[data-tip]:hover::after { opacity: 1; visibility: visible; }
+/* fallback for browsers without anchor positioning */
+@supports not (position-area: block-start) {
+  [data-tip] { position: relative; }
+  [data-tip]::after {
+    position: absolute;
+    bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+  }
+}
+.scopewrap { margin-top: 14px; }
+
 .hint { text-align:center; font-size:10px; letter-spacing:.16em; color:var(--faint); margin: 18px 4px 8px; line-height:1.9; }
 .hint b { color: var(--dim); font-weight:400; }
 footer { text-align:center; font-size:9px; letter-spacing:.2em; color:#33362e; margin-top:10px; }
@@ -247,14 +314,6 @@ footer { text-align:center; font-size:9px; letter-spacing:.2em; color:#33362e; m
     <div class="masthead">
       <h1>AIR<span class="gap">GAP</span></h1>
       <div class="sub">ACOUSTIC DATA COUPLER · <em>MK-1</em> · NO WIRES · NO NETWORK</div>
-      <div class="profrow">
-        <span>BAND</span>
-        <span class="profsw">
-          <button id="profAud" class="sel">AUDIBLE 1.9–5.1 kHz</button>
-          <button id="profUlt">ULTRASONIC 16–19 kHz</button>
-        </span>
-        <span id="fsInfo">FS —</span>
-      </div>
     </div>
     <div class="grille"></div>
   </header>
@@ -264,6 +323,32 @@ footer { text-align:center; font-size:9px; letter-spacing:.2em; color:#33362e; m
     <button id="tabRx" role="tab" aria-selected="false">▼ RECEIVE</button>
   </div>
 
+  <!-- ================= CONTROL DECK ================= -->
+  <section class="panel" id="ctrlPanel">
+    <span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
+    <div class="plabel"><b>◤ CONTROL DECK</b> LINK PARAMETERS <span class="tag">MATCH ON BOTH ENDS</span></div>
+    <div class="deck">
+      <div class="knobunit" data-tip="Carrier band for the 16 data tones. Click to switch, or drag / arrow keys. Both devices must be set to the same band. Ultrasonic is near-silent to most adults but needs decent speakers and mics — many phones roll off above 18 kHz.">
+        <div class="klabel">BAND</div>
+        <div id="knobBand"></div>
+        <div class="kvalue" id="bandVal">AUDIBLE</div>
+      </div>
+      <div class="knobunit" data-tip="Symbol duration — the speed vs. robustness trade-off. 1× = 90 ms symbols, 1.5× = 60 ms, 2.25× = 40 ms. Faster symbols carry less energy, so less range and noise margin. Click to step, drag to turn. Both devices must use the same speed.">
+        <div class="klabel">SPEED</div>
+        <div id="knobSpeed"></div>
+        <div class="kvalue" id="spdVal">ROBUST 1x</div>
+      </div>
+      <div class="deckro">
+        <div class="ro" data-tip="Hardware sample rate and analysis FFT size — detected once audio starts. Devices at different rates (44.1 vs 48 kHz) interoperate: tone frequencies are absolute Hz.">
+          <div class="k">SAMPLE RATE · FFT</div><div class="v" id="fsInfo">—</div>
+        </div>
+        <div class="ro" data-tip="Raw byte rate at the current speed (2 symbols per byte), before FEC and framing overhead.">
+          <div class="k">RAW RATE</div><div class="v" id="rateVal">5.6 B/s</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- ================= TRANSMIT ================= -->
   <section class="panel tx" id="txPanel">
     <span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
@@ -271,29 +356,29 @@ footer { text-align:center; font-size:9px; letter-spacing:.2em; color:#33362e; m
 
     <textarea id="txText" spellcheck="false" placeholder="TYPE MESSAGE…">Hello across the air gap 📡</textarea>
     <div class="filebar">
-      <button id="txFileBtn">▤ LOAD FILE…</button>
+      <button id="txFileBtn" data-tip="Send a small file (up to 8 KB) instead of text. Any bytes work — the receiver auto-detects UTF-8 vs. binary.">▤ LOAD FILE…</button>
       <span class="filechip" id="txChip"><span id="txChipName"></span><button id="txChipClear" title="clear file">✕</button></span>
       <input type="file" id="txFile">
     </div>
 
     <div class="readouts">
-      <div class="ro"><div class="k">PAYLOAD</div><div class="v" id="txBytes">0 B</div></div>
-      <div class="ro"><div class="k">EST. AIRTIME</div><div class="v" id="txDur">—</div></div>
-      <div class="ro"><div class="k">SYMBOL RATE</div><div class="v" id="txRate">11.1/s</div></div>
+      <div class="ro" data-tip="Exact byte count that will be transmitted: your text as UTF-8, or the loaded file."><div class="k">PAYLOAD</div><div class="v" id="txBytes">0 B</div></div>
+      <div class="ro" data-tip="Every frame carries fixed overhead regardless of size: preamble + sync (~9 symbols), an error-protected length header (24 symbols), 32 Reed-Solomon parity bytes per 223-byte block, and a 4-byte CRC-32. That's why even a 1-byte message takes several seconds."><div class="k">EST. AIRTIME</div><div class="v" id="txDur">—</div></div>
+      <div class="ro" data-tip="Tones per second on air. Each symbol is one of 16 tones and carries 4 bits (half a byte). Set by the SPEED switch above."><div class="k">SYMBOL RATE</div><div class="v" id="txRate">11.1/s</div></div>
     </div>
 
-    <div class="fader">
+    <div class="fader" data-tip="Output level into the speaker. Default 0.80 is a good start — turn the device's own volume up and lower this only if the receiver's LVL meter stays pinned at max (clipping).">
       <label>VOLUME</label>
       <input type="range" id="txVol" min="0" max="1" step="0.01" value="0.8">
       <output id="txVolOut">0.80</output>
     </div>
 
-    <button class="big arm" id="txSend">◉ TRANSMIT</button>
+    <button class="big arm" id="txSend" data-tip="Encodes whatever is in the text box (or the loaded file) RIGHT NOW into sound and plays it. Re-encodes on every press, so edits are picked up.">◉ TRANSMIT</button>
     <div class="btnrow">
-      <button id="txAgain" class="hide">↻ SEND AGAIN</button>
-      <button id="txAbort" class="danger hide">■ ABORT</button>
+      <button id="txAgain" class="hide" data-tip="Replays the exact audio of the previous transmission, byte for byte — even if you've edited the text since. Use it for retries when the receiver missed the frame.">↻ SEND AGAIN</button>
+      <button id="txAbort" class="danger hide" data-tip="Cut playback immediately. The receiver will report a failed decode.">■ ABORT</button>
     </div>
-    <div class="trackrow">
+    <div class="trackrow" data-tip="Playback position of the outgoing audio frame.">
       <div class="track"><div class="fill" id="txFill"></div><div class="cap" id="txCap"></div></div>
       <div class="t" id="txTime">0.0 / 0.0 s</div>
     </div>
@@ -306,21 +391,22 @@ footer { text-align:center; font-size:9px; letter-spacing:.2em; color:#33362e; m
     <div class="plabel"><b>◤ RECEIVE</b> DEMODULATOR — STATE MACHINE · EARLY/LATE CLOCK <span class="tag">MIC IN</span></div>
 
     <div class="ledrow">
-      <div class="led g" id="ledListen"><i></i><span>LISTEN</span></div>
-      <div class="led a" id="ledCarrier"><i></i><span>CARRIER</span></div>
-      <div class="led a" id="ledHeader"><i></i><span>HEADER</span></div>
-      <div class="led a" id="ledPayload"><i></i><span>PAYLOAD</span></div>
-      <div class="led g" id="ledDone"><i></i><span>OK</span></div>
-      <div class="led r" id="ledErr"><i></i><span>ERR</span></div>
+      <div class="led g" id="ledListen" data-tip="Idle: scanning the band for a preamble — the alternating two-tone pattern that starts every frame."><i></i><span>LISTEN</span></div>
+      <div class="led a" id="ledCarrier" data-tip="Preamble detected. The decoder has locked its symbol clock to the sender and is waiting for the sync marker."><i></i><span>CARRIER</span></div>
+      <div class="led a" id="ledHeader" data-tip="Reading the frame header: payload length, protected by Reed-Solomon FEC and CRC-16."><i></i><span>HEADER</span></div>
+      <div class="led a" id="ledPayload" data-tip="Reading payload symbols. The clock is continuously re-centered to track speaker/mic clock drift."><i></i><span>PAYLOAD</span></div>
+      <div class="led ann" id="annResult" data-tip="Outcome of the last frame — OK (decoded, CRC-32 verified) or ERR (failed; the message below says at which stage). One lamp because they're mutually exclusive. Latches until the next transmission starts."><b id="annTxt">—</b><span>RESULT</span></div>
     </div>
 
-    <button class="big hot" id="rxStart">◉ START LISTENING</button>
+    <button class="big hot" id="rxStart" data-tip="Opens the microphone raw — echo cancellation, noise suppression and auto-gain are disabled so browser processing can't mangle the signal.">◉ START LISTENING</button>
 
-    <canvas class="scope" id="scope" style="margin-top:14px"></canvas>
-    <div class="meter"><span class="k">LVL</span><div class="track"><div class="fill" id="lvlFill"></div></div><span class="t" id="lvlTxt">−∞ dB</span></div>
-    <div class="meter"><span class="k">CNF</span><div class="track"><div class="fill" id="cnfFill"></div></div><span class="t" id="cnfTxt">— dB</span></div>
+    <div class="scopewrap" data-tip="Live spectrum of the receive band. Amber ticks mark the 16 data tone frequencies; red ticks mark the two preamble/sync tones. A transmission shows as a single sharp peak hopping between the ticks.">
+      <canvas class="scope" id="scope"></canvas>
+    </div>
+    <div class="meter" data-tip="Microphone input level (RMS, decaying peak). You want a clear bounce while the sender plays; if it sits pinned at the right edge the input is clipping — move apart or lower the volume."><span class="k">LVL</span><div class="track"><div class="fill" id="lvlFill"></div></div><span class="t" id="lvlTxt">−∞ dB</span></div>
+    <div class="meter" data-tip="Symbol confidence: power of the strongest tone vs. the runner-up, in dB. Higher is cleaner. Below ~6 dB, symbol errors get likely and the FEC has to work hard."><span class="k">CNF</span><div class="track"><div class="fill" id="cnfFill"></div></div><span class="t" id="cnfTxt">— dB</span></div>
 
-    <div class="trackrow">
+    <div class="trackrow" data-tip="SYM = payload progress in symbols: received / expected. Each byte takes two symbols (one per 4-bit nibble), including FEC parity bytes.">
       <div class="track"><div class="fill" id="rxFill"></div></div>
       <div class="t" id="rxSym">SYM —/—</div>
     </div>
@@ -329,10 +415,10 @@ footer { text-align:center; font-size:9px; letter-spacing:.2em; color:#33362e; m
       <div class="outmeta" id="rxMeta">AWAITING TRANSMISSION</div>
       <pre class="out" id="rxOut"></pre>
       <div class="btnrow">
-        <button id="rxCopy" disabled>⧉ COPY TEXT</button>
-        <button id="rxSave" disabled>▼ DOWNLOAD BYTES</button>
+        <button id="rxCopy" disabled data-tip="Copy the decoded UTF-8 text to the clipboard. Disabled when the payload isn't valid text.">⧉ COPY TEXT</button>
+        <button id="rxSave" disabled data-tip="Save the raw received bytes as airgap-payload.bin — works for any payload, text or binary.">▼ DOWNLOAD BYTES</button>
       </div>
-      <div class="errbox" id="rxErr"></div>
+      <div class="errbox" id="rxErr" data-tip="Sticky: the last error stays here until a frame decodes successfully or you restart listening."></div>
     </div>
   </section>
 
@@ -341,8 +427,8 @@ footer { text-align:center; font-size:9px; letter-spacing:.2em; color:#33362e; m
     <span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
     <div class="plabel"><b>◤ DIAGNOSTICS</b> IN-MEMORY MODEM VERIFICATION <span class="tag">NO AUDIO USED</span></div>
     <div class="btnrow">
-      <button id="diagLoop">▸ LOOPBACK SELF-TEST</button>
-      <button id="diagFull">▸ FULL TEST SUITE</button>
+      <button id="diagLoop" data-tip="Encodes a test message and pipes the samples straight into the decoder in memory — no speaker or microphone involved. Uses the currently selected band and speed. Validates the whole modem on one device.">▸ LOOPBACK SELF-TEST</button>
+      <button id="diagFull" data-tip="Runs the complete suite: CRC test vectors, Reed-Solomon error-injection (corrects 16 errors per block), FFT sanity, and modulate→demodulate round trips with noise and clock drift. Same as opening the page with ?selftest.">▸ FULL TEST SUITE</button>
       <span id="diagBadge"></span>
     </div>
     <div class="diagout" id="diagOut"></div>
@@ -357,7 +443,7 @@ footer { text-align:center; font-size:9px; letter-spacing:.2em; color:#33362e; m
 
   <div class="hint">
     <b>FIELD MANUAL:</b> HOLD DEVICES 30 CM – 1 M APART · RAISE VOLUME · QUIET ROOM HELPS<br>
-    ULTRASONIC BAND IS HARDWARE-DEPENDENT — BOTH ENDS MUST USE THE SAME BAND
+    BOTH ENDS MUST USE THE SAME BAND <b>AND</b> SPEED · ULTRASONIC IS HARDWARE-DEPENDENT · HOVER ANY CONTROL FOR HELP
   </div>
   <footer>SINGLE FILE · WORKS OFFLINE · ADD ?selftest TO URL FOR FULL DIAGNOSTIC BOOT</footer>
 </div>
@@ -377,8 +463,15 @@ footer { text-align:center; font-size:9px; letter-spacing:.2em; color:#33362e; m
 
 // ---- Constants ----
 
-const SYMBOL_SEC = 0.09;      // symbol duration (s)
-const RAMP_SEC   = 0.008;     // raised-cosine edge ramp (s)
+// Speed presets: symbol duration is the speed/robustness trade-off (the tone
+// alphabet itself does not affect speed). Both ends must use the same preset.
+// Durations are chosen so the derived FFT size keeps >=3 bins between adjacent
+// tones for every supported speed x band x sample-rate combination.
+const SPEEDS = {
+  robust: { label: 'ROBUST 1x',    symbolSec: 0.090, rampSec: 0.008 }, // ~5.5 B/s raw
+  fast:   { label: 'FAST 1.5x',    symbolSec: 0.060, rampSec: 0.007 }, // ~8.3 B/s raw
+  turbo:  { label: 'TURBO 2.25x',  symbolSec: 0.040, rampSec: 0.005 }, // ~12.5 B/s raw
+};
 const RS_DATA    = 223;       // data bytes per RS block
 const RS_PARITY  = 32;        // parity bytes per RS block (corrects 16)
 const HDR_PARITY = 8;         // parity bytes for the 4-byte header (corrects 4)
@@ -603,11 +696,13 @@ function hannWindow(n) {
 
 // ---- Params (everything derived from the actual sample rate) ----
 
-function makeParams(fs, profileName) {
+function makeParams(fs, profileName, speedName) {
   const prof = PROFILES[profileName || 'audible'];
   if (!prof) throw new Error('unknown profile: ' + profileName);
-  const symbolLen = Math.round(SYMBOL_SEC * fs);
-  const rampLen = Math.round(RAMP_SEC * fs);
+  const spd = SPEEDS[speedName || 'robust'];
+  if (!spd) throw new Error('unknown speed: ' + speedName);
+  const symbolLen = Math.round(spd.symbolSec * fs);
+  const rampLen = Math.round(spd.rampSec * fs);
   const flat = symbolLen - 2 * rampLen;
   let fftSize = 512;
   while (fftSize * 2 <= flat * 0.9 && fftSize < 4096) fftSize <<= 1;
@@ -622,6 +717,7 @@ function makeParams(fs, profileName) {
 
   return {
     fs, profile: profileName || 'audible', prof,
+    speed: speedName || 'robust', symbolSec: spd.symbolSec,
     symbolLen, rampLen, fftSize,
     hop: fftSize >> 2,
     dataFreqs,
@@ -658,8 +754,8 @@ function totalSymbolsFor(payloadLen) {
   return PREAMBLE_SYMS + 1 + 12 * 2 + bodyLengthFor(payloadLen) * 2 + 1;
 }
 
-function estimateSeconds(payloadLen) {
-  return totalSymbolsFor(payloadLen) * SYMBOL_SEC + 0.5; // + lead/tail padding
+function estimateSeconds(payloadLen, speedName) {
+  return totalSymbolsFor(payloadLen) * SPEEDS[speedName || 'robust'].symbolSec + 0.5; // + lead/tail padding
 }
 
 // header: [len_hi, len_lo, crc16_hi, crc16_lo] + 8 RS parity = 12 bytes
@@ -743,9 +839,9 @@ const DUAL_MIN = 0.25; // min/max power ratio for the dual-tone sync marker
 const EL_IMBALANCE = 0.15; // early-late gate deadband
 
 class Demodulator {
-  constructor(fs, profileName, cb) {
+  constructor(fs, profileName, cb, speedName) {
     this.fs = fs;
-    this.p = makeParams(fs, profileName);
+    this.p = makeParams(fs, profileName, speedName);
     this.cb = cb || {};
     let capBits = 15;
     while ((1 << capBits) < this.p.symbolLen * 16 + this.p.fftSize * 2) capBits++;
@@ -966,6 +1062,14 @@ class Demodulator {
     this.nibbles.push(best);
     this.confs.push(this.lastConfDb);
     if (this.cb.onProgress) this.cb.onProgress(this.nibbles.length, this.expected, this.state);
+    // stream raw (pre-FEC, unverified) payload bytes as they complete
+    if (this.state === 'PAYLOAD' && (this.nibbles.length & 1) === 0 && this.cb.onLiveByte) {
+      const bi = (this.nibbles.length >> 1) - 1;
+      const di = this.liveMap[bi];
+      if (di >= 0) {
+        this.cb.onLiveByte(di, (this.nibbles[2 * bi] << 4) | this.nibbles[2 * bi + 1], this.payloadLen);
+      }
+    }
     const adj = this._clockAdjust(P.dataFreqs[best]);
     this.symCenter += P.symbolLen + adj;
 
@@ -998,6 +1102,17 @@ class Demodulator {
     this.hdrCorrected = dec.corrected;
     this.nibbles = [];
     this.expected = bodyLengthFor(len) * 2;
+    // wire-position -> payload-byte-index map (-1 = RS parity or CRC-32
+    // trailer) so the UI can stream raw bytes live, before FEC runs
+    const map = [];
+    let remaining = len + 4, dataIdx = 0;
+    while (remaining > 0) {
+      const k = Math.min(RS_DATA, remaining);
+      for (let i = 0; i < k; i++) { map.push(dataIdx < len ? dataIdx : -1); dataIdx++; }
+      for (let i = 0; i < RS_PARITY; i++) map.push(-1);
+      remaining -= k;
+    }
+    this.liveMap = map;
     this._setState('PAYLOAD');
   }
 
@@ -1072,7 +1187,7 @@ function rmsOf(sig) {
 //   snrDb: add white gaussian noise at this SNR; drift: resample ratio
 function loopback(payload, fs, opts) {
   opts = opts || {};
-  const p = makeParams(fs, opts.profile || 'audible');
+  const p = makeParams(fs, opts.profile || 'audible', opts.speed);
   let sig = modulate(payload, p, { amplitude: 0.8 });
   if (opts.drift && opts.drift !== 1) sig = resampleLinear(sig, opts.drift);
   if (opts.snrDb != null) {
@@ -1083,7 +1198,8 @@ function loopback(payload, fs, opts) {
   let result = null;
   const d = new Demodulator(fs, opts.profile || 'audible', {
     onResult: (r) => { if (!result) result = r; },
-  });
+    onLiveByte: opts.onLiveByte,
+  }, opts.speed);
   for (let off = 0; off < sig.length; off += 1024) {
     d.push(sig.subarray(off, Math.min(off + 1024, sig.length)));
   }
@@ -1222,8 +1338,25 @@ function selfTests() {
   modemTest('Loopback + white noise, SNR 3 dB (stretch)', false, 48000, { snrDb: 3 });
   modemTest('Loopback + clock drift +0.2% (2000 ppm)', true, 48000, { drift: 1.002 });
   modemTest('Loopback + clock drift -0.2% + noise 20 dB', true, 48000, { drift: 0.998, snrDb: 20 });
+  modemTest('Loopback ultrasonic + white noise, SNR 10 dB', true, 48000, { profile: 'ultrasonic', snrDb: 10 });
   modemTest('Loopback multi-block payload (300 bytes) @ 48000 Hz', true, 48000, { snrDb: 20 }, randBytes(300));
   modemTest('Loopback 1-byte payload', true, 48000, {}, new Uint8Array([0x42]));
+  modemTest('Loopback FAST (1.5x) clean @ 48000 Hz', true, 48000, { speed: 'fast' });
+  modemTest('Loopback FAST (1.5x) + white noise, SNR 10 dB', true, 48000, { speed: 'fast', snrDb: 10 });
+  modemTest('Loopback TURBO (2.25x) clean @ 48000 Hz', true, 48000, { speed: 'turbo' });
+  modemTest('Loopback TURBO (2.25x) clean @ 44100 Hz', true, 44100, { speed: 'turbo' });
+  modemTest('Loopback TURBO (2.25x) + white noise, SNR 10 dB', true, 48000, { speed: 'turbo', snrDb: 10 });
+  modemTest('Loopback TURBO (2.25x) + clock drift +0.2%', true, 48000, { speed: 'turbo', drift: 1.002 });
+  modemTest('Loopback TURBO (2.25x) ultrasonic @ 48000 Hz', true, 48000, { speed: 'turbo', profile: 'ultrasonic' });
+
+  test('Live byte stream matches payload (clean loopback)', true, () => {
+    const got = [];
+    const { result } = loopback(MSG50, 48000, { onLiveByte: (i, b) => { got[i] = b; } });
+    const ok = !!result && result.ok && got.length === MSG50.length &&
+               MSG50.every((b, i) => got[i] === b);
+    return { pass: ok, detail: ok ? got.length + '/' + MSG50.length + ' raw bytes streamed in order'
+                                  : 'stream mismatch (' + got.length + ' bytes)' };
+  });
 
   test('50-byte frame duration is 10-20 s and matches estimate', true, () => {
     const est = estimateSeconds(50);
@@ -1236,7 +1369,7 @@ function selfTests() {
 }
 
 return {
-  SYMBOL_SEC, RS_DATA, RS_PARITY, HDR_PARITY, PREAMBLE_SYMS, MAX_PAYLOAD, PROFILES,
+  SPEEDS, RS_DATA, RS_PARITY, HDR_PARITY, PREAMBLE_SYMS, MAX_PAYLOAD, PROFILES,
   crc16, crc32,
   rsEncode, rsDecode,
   fftInPlace, hannWindow,
@@ -1258,6 +1391,7 @@ const on = (id, ev, fn) => $(id).addEventListener(ev, fn);
 
 let ctx = null;            // AudioContext, created on first user gesture (iOS)
 let profileName = 'audible';
+let speedName = 'robust';
 let mode = 'tx';
 
 // ---- helpers ----
@@ -1279,28 +1413,127 @@ function log(msg, cls) {
   while (el.childElementCount > 80) el.removeChild(el.firstChild);
   el.scrollTop = el.scrollHeight;
 }
+function updateFsInfo() {
+  if (!ctx) return;
+  const p = AirGap.makeParams(ctx.sampleRate, profileName, speedName);
+  $('fsInfo').textContent = 'FS ' + ctx.sampleRate + ' Hz · FFT ' + p.fftSize;
+}
 function ensureCtx() {
   if (!ctx) {
     const AC = window.AudioContext || window.webkitAudioContext;
     ctx = new AC();
     log('audio context up · fs ' + ctx.sampleRate + ' Hz');
-    const p = AirGap.makeParams(ctx.sampleRate, profileName);
-    $('fsInfo').textContent = 'FS ' + ctx.sampleRate + ' Hz · FFT ' + p.fftSize;
+    updateFsInfo();
   }
   if (ctx.state === 'suspended') ctx.resume();
   return ctx;
 }
 
-// ---- profile switch ----
+// ---- rotary knob component (DOM-based, no SVG) ----
+// Stepped detent knob: click steps to the next position, drag rotates,
+// arrow keys work when focused. Detents are laid out over `span` degrees.
+function makeKnob(el, opts) {
+  const n = opts.detents.length;
+  const span = opts.span || 180;
+  const angles = opts.detents.map((d, i) => (n === 1 ? 0 : -span / 2 + (span / (n - 1)) * i));
+  el.classList.add('knob');
+  el.tabIndex = 0;
+  el.setAttribute('role', 'slider');
+  el.setAttribute('aria-valuemin', '0');
+  el.setAttribute('aria-valuemax', String(n - 1));
+  const put = (node, deg, radius, counter) => {
+    node.style.transform = 'translate(-50%,-50%) rotate(' + deg + 'deg) translateY(-' + radius + 'px)' +
+      (counter ? ' rotate(' + (-deg) + 'deg)' : '');
+    el.appendChild(node);
+    return node;
+  };
+  const face = document.createElement('div');
+  face.className = 'kface';
+  el.appendChild(face);
+  for (let a = 0; a < 360; a += 15) put(document.createElement('i'), a, 46);
+  const majors = angles.map(a => { const t = document.createElement('i'); t.className = 'major'; return put(t, a, 46); });
+  const labs = angles.map((a, i) => {
+    const b = document.createElement('b');
+    b.textContent = opts.detents[i].label;
+    return put(b, a, 60, true);
+  });
+  const wrap = document.createElement('div');
+  wrap.className = 'kptrwrap';
+  wrap.innerHTML = '<div class="kptr"></div>';
+  el.appendChild(wrap);
+  const hub = document.createElement('div');
+  hub.className = 'khub';
+  el.appendChild(hub);
+
+  let idx = opts.index || 0;
+  function render() {
+    el.style.setProperty('--angle', angles[idx] + 'deg');
+    el.setAttribute('aria-valuenow', String(idx));
+    el.setAttribute('aria-valuetext', opts.detents[idx].label);
+    majors.forEach((m, i) => m.classList.toggle('lit', i === idx));
+    labs.forEach((b, i) => b.classList.toggle('lit', i === idx));
+  }
+  function set(i, fire) {
+    const next = ((i % n) + n) % n;
+    const changed = next !== idx;
+    idx = next;
+    render();
+    if (fire && changed && opts.onChange) opts.onChange(idx);
+  }
+  let drag = null;
+  el.addEventListener('pointerdown', (e) => {
+    el.setPointerCapture(e.pointerId);
+    drag = { x: e.clientX, y: e.clientY, moved: false };
+    e.preventDefault();
+  });
+  el.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 6) drag.moved = true;
+    if (!drag.moved) return;
+    const r = el.getBoundingClientRect();
+    const ang = Math.atan2(e.clientX - (r.left + r.width / 2), -(e.clientY - (r.top + r.height / 2))) * 180 / Math.PI;
+    let best = 0, bd = 1e9;
+    angles.forEach((a, i) => { const d = Math.abs(a - ang); if (d < bd) { bd = d; best = i; } });
+    if (best !== idx) set(best, true);
+  });
+  el.addEventListener('pointerup', () => { if (drag && !drag.moved) set(idx + 1, true); drag = null; });
+  el.addEventListener('pointercancel', () => { drag = null; });
+  el.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowUp') { set(idx + 1, true); e.preventDefault(); }
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') { set(idx - 1, true); e.preventDefault(); }
+  });
+  render();
+  return { set: (i) => set(i, false), get index() { return idx; } };
+}
+
+// ---- band / speed controls ----
 function setProfile(name) {
   profileName = name;
-  $('profAud').classList.toggle('sel', name === 'audible');
-  $('profUlt').classList.toggle('sel', name === 'ultrasonic');
+  $('bandVal').textContent = AirGap.PROFILES[name].label;
   log('band set to ' + AirGap.PROFILES[name].label);
+  updateFsInfo();
   if (listening) restartDemod();
 }
-on('profAud', 'click', () => setProfile('audible'));
-on('profUlt', 'click', () => setProfile('ultrasonic'));
+function setSpeed(name) {
+  speedName = name;
+  const s = AirGap.SPEEDS[name];
+  $('spdVal').textContent = s.label;
+  $('rateVal').textContent = (1 / s.symbolSec / 2).toFixed(1) + ' B/s';
+  log('speed set to ' + s.label + ' (' + (1 / s.symbolSec).toFixed(1) + ' sym/s)');
+  updateFsInfo();
+  refreshTxInfo();
+  if (listening) restartDemod();
+}
+makeKnob($('knobBand'), {
+  detents: [{ label: 'AUD' }, { label: 'ULT' }],
+  span: 120, index: 0,
+  onChange: (i) => setProfile(i === 0 ? 'audible' : 'ultrasonic'),
+});
+makeKnob($('knobSpeed'), {
+  detents: [{ label: '1×' }, { label: '1.5×' }, { label: '2.25×' }],
+  span: 180, index: 0,
+  onChange: (i) => setSpeed(['robust', 'fast', 'turbo'][i]),
+});
 
 // ---- mode rocker ----
 function setMode(m) {
@@ -1327,7 +1560,8 @@ function currentPayload() {
 function refreshTxInfo() {
   const n = currentPayload().length;
   $('txBytes').textContent = fmtBytes(n) + (filePayload ? ' ▤' : '');
-  $('txDur').textContent = n ? fmtSecs(AirGap.estimateSeconds(n)) : '—';
+  $('txDur').textContent = n ? fmtSecs(AirGap.estimateSeconds(n, speedName)) : '—';
+  $('txRate').textContent = (1 / AirGap.SPEEDS[speedName].symbolSec).toFixed(1) + '/s';
   $('txSend').disabled = txPlaying || n === 0 || n > AirGap.MAX_PAYLOAD;
   const err = $('txErr');
   if (n > AirGap.MAX_PAYLOAD) {
@@ -1409,7 +1643,7 @@ async function transmit() {
       AirGap.PROFILES[profileName].label);
   // yield one frame so the UI shows state before the (brief) synth burst
   await new Promise(r => setTimeout(r, 30));
-  const p = AirGap.makeParams(c.sampleRate, profileName);
+  const p = AirGap.makeParams(c.sampleRate, profileName, speedName);
   const sig = AirGap.modulate(payload, p, { amplitude: 1.0 });
   lastSig = sig; lastRate = c.sampleRate;
   log('on air · ' + fmtSecs(sig.length / c.sampleRate), 'a');
@@ -1430,6 +1664,7 @@ on('txAbort', 'click', () => stopTx(true));
 let listening = false, demod = null, micStream = null, micNode = null, tapNode = null, sinkNode = null;
 let rxGot = 0, rxExpected = 0, rxRaf = 0;
 let lastResultBytes = null, lastResultText = null;
+let liveBuf = null, liveN = 0; // raw pre-FEC bytes streamed during PAYLOAD
 
 const WORKLET_SRC = `
 class AirgapCapture extends AudioWorkletProcessor {
@@ -1459,9 +1694,18 @@ function setLeds(state) {
     el.classList.toggle('blink', k === state && k !== 'LISTENING');
   }
 }
-function flashLed(id) {
-  $(id).classList.add('on');
-  setTimeout(() => { if (!listening || id === 'ledDone' || id === 'ledErr') $(id).classList.remove('on'); }, 4000);
+// RESULT annunciator: one lamp, latched, mutually exclusive OK / ERR
+function setResult(kind) {
+  $('annResult').classList.toggle('ok', kind === 'ok');
+  $('annResult').classList.toggle('err', kind === 'err');
+  $('annTxt').textContent = kind === 'ok' ? 'OK' : kind === 'err' ? 'ERR' : '—';
+}
+
+// printable preview of possibly-garbled bytes for the live raw stream
+function previewText(bytes) {
+  let s = '';
+  try { s = new TextDecoder('utf-8').decode(bytes); } catch (e) {}
+  return s.replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, '·');
 }
 
 const ERRORS = {
@@ -1477,21 +1721,33 @@ function demodCallbacks() {
       setLeds(s);
       if (s === 'PREAMBLE') {
         log('carrier detected — preamble lock', 'g');
-        $('ledDone').classList.remove('on'); $('ledErr').classList.remove('on');
-        $('rxErr').classList.remove('show');
+        // note: the error box is NOT cleared here — it stays until a success
+        setResult(null);
       } else if (s === 'HEADER') log('sync marker — reading header');
       else if (s === 'PAYLOAD') {
         log('header ok — ' + demod.payloadLen + ' B incoming (' +
-            fmtSecs(demod.expected / 2 * 2 * AirGap.SYMBOL_SEC) + ')', 'g');
+            fmtSecs(demod.expected * demod.p.symbolLen / demod.fs) + ')', 'g');
+        liveBuf = new Uint8Array(demod.payloadLen);
+        liveN = 0;
+        $('rxOut').classList.add('raw');
+        $('rxOut').textContent = '▌';
+        $('rxMeta').textContent = 'RECEIVING — LIVE RAW STREAM (FEC NOT YET APPLIED)';
       }
       if (s !== 'PAYLOAD' && s !== 'HEADER') { rxGot = 0; rxExpected = 0; }
     },
     onProgress: (got, expected) => { rxGot = got; rxExpected = expected; },
+    onLiveByte: (i, b) => {
+      if (!liveBuf) return;
+      liveBuf[i] = b;
+      if (i + 1 > liveN) liveN = i + 1;
+      $('rxOut').textContent = previewText(liveBuf.subarray(0, liveN)) + '▌';
+    },
     onResult: (r) => {
       if (r.ok) {
         lastResultBytes = r.payload;
         lastResultText = null;
         try { lastResultText = new TextDecoder('utf-8', { fatal: true }).decode(r.payload); } catch (e) {}
+        $('rxOut').classList.remove('raw'); // verified: amber raw becomes green
         $('rxOut').textContent = lastResultText !== null
           ? lastResultText
           : '[binary payload — ' + r.payload.length + ' bytes]\n' + hexPreview(r.payload);
@@ -1501,14 +1757,21 @@ function demodCallbacks() {
           ' · CONF MIN ' + r.stats.minConfDb.toFixed(1) + ' dB';
         $('rxCopy').disabled = lastResultText === null;
         $('rxSave').disabled = false;
-        flashLed('ledDone');
+        $('rxErr').classList.remove('show'); // a success clears the sticky error
+        setResult('ok');
         log('✓ payload received · ' + r.payload.length + ' B · ' + r.stats.corrected + ' corrected', 'g');
       } else {
-        $('rxErr').textContent = ERRORS[r.error] || r.error;
+        if (liveBuf && liveN) { // keep the partial raw stream visible, minus cursor
+          $('rxOut').textContent = previewText(liveBuf.subarray(0, liveN));
+          $('rxMeta').textContent = 'DECODE FAILED — SHOWING UNVERIFIED RAW STREAM (' + liveN + ' B)';
+        }
+        $('rxErr').textContent = 'LAST ERROR ' + now() + ' — ' + (ERRORS[r.error] || r.error);
         $('rxErr').classList.add('show');
-        flashLed('ledErr');
+        setResult('err');
         log('✗ decode failed: ' + (ERRORS[r.error] || r.error), 'r');
       }
+      liveBuf = null;
+      liveN = 0;
     },
   };
 }
@@ -1527,7 +1790,7 @@ function hexPreview(bytes) {
 
 function restartDemod() {
   if (!ctx) return;
-  demod = new AirGap.Demodulator(ctx.sampleRate, profileName, demodCallbacks());
+  demod = new AirGap.Demodulator(ctx.sampleRate, profileName, demodCallbacks(), speedName);
   setLeds('LISTENING');
 }
 
@@ -1535,6 +1798,7 @@ async function startListening() {
   const c = ensureCtx();
   await c.resume();
   $('rxErr').classList.remove('show');
+  setResult(null);
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     micFail('MICROPHONE API UNAVAILABLE — use HTTPS or localhost');
     return;
@@ -1555,9 +1819,14 @@ async function startListening() {
   if (c.audioWorklet) {
     try {
       if (!workletReady) {
-        const url = URL.createObjectURL(new Blob([WORKLET_SRC], { type: 'application/javascript' }));
-        await c.audioWorklet.addModule(url);
-        URL.revokeObjectURL(url);
+        try {
+          const url = URL.createObjectURL(new Blob([WORKLET_SRC], { type: 'application/javascript' }));
+          await c.audioWorklet.addModule(url);
+          URL.revokeObjectURL(url);
+        } catch (e) {
+          // file:// origins reject blob worklet modules; a data: URL still works
+          await c.audioWorklet.addModule('data:application/javascript;base64,' + btoa(WORKLET_SRC));
+        }
         workletReady = true;
       }
       tapNode = new AudioWorkletNode(c, 'airgap-capture');
@@ -1675,12 +1944,14 @@ async function runLoopback() {
   $('diagOut').innerHTML = '';
   $('diagBadge').innerHTML = '';
   $('diagLoop').disabled = $('diagFull').disabled = true;
-  log('loopback self-test running…');
   const fs = (ctx && ctx.sampleRate) || 48000;
+  const base = { profile: profileName, speed: speedName };
+  log('loopback self-test running (' + AirGap.PROFILES[profileName].label + ' · ' +
+      AirGap.SPEEDS[speedName].label + ')…');
   const msg = AirGap.textBytes('AIRGAP LOOPBACK ' + Date.now());
   const cases = [
-    ['clean @ ' + fs + ' Hz', {}],
-    ['white noise SNR 10 dB', { snrDb: 10 }],
+    ['clean @ ' + fs + ' Hz', Object.assign({}, base)],
+    ['white noise SNR 10 dB', Object.assign({ snrDb: 10 }, base)],
   ];
   let allOk = true;
   for (const [name, opts] of cases) {
