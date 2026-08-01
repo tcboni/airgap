@@ -1434,7 +1434,7 @@ Hello across the air gap 📡</textarea
                 <div
                   class="knobunit"
                   id="spdUnit"
-                  data-tip="Symbol duration — the speed vs. robustness trade-off. 1× = 90 ms symbols, 1.5× = 60 ms, 2.25× = 40 ms, 3× = 30 ms. Faster symbols carry less energy, so less range and noise margin — 3× wants close range and a quiet room. Click or drag to aim. Both devices must use the same speed (or enable AUTO on the receiver)."
+                  data-tip="Symbol duration — the speed vs. reliability trade-off. 1× = 90 ms symbols, 1.5× = 60 ms, 2.25× = 40 ms, 3× = 30 ms. Faster symbols carry less energy, so less range and noise margin — 3× wants close range and a quiet room. Click or drag to aim. Both devices must use the same speed (or enable AUTO on the receiver)."
                 >
                   <div class="klabel">SPEED</div>
                   <div id="knobSpeed"></div>
@@ -1605,12 +1605,12 @@ NO FRAME RECEIVED YET</pre
 
         // ---- Constants ----
 
-        // Speed presets: symbol duration is the speed/robustness trade-off (the tone
+        // Speed presets: symbol duration is the speed/reliability trade-off (the tone
         // alphabet itself does not affect speed). Both ends must use the same preset.
         // Durations are chosen so the derived FFT size keeps >=3 bins between adjacent
         // tones for every supported speed x band x sample-rate combination.
         const SPEEDS = {
-          robust: { label: "ROBUST 1x", symbolSec: 0.09, rampSec: 0.008 }, // ~5.5 B/s raw
+          normal: { label: "NORMAL 1x", symbolSec: 0.09, rampSec: 0.008 }, // ~5.5 B/s raw
           fast: { label: "FAST 1.5x", symbolSec: 0.06, rampSec: 0.007 }, // ~8.3 B/s raw
           turbo: { label: "TURBO 2.25x", symbolSec: 0.04, rampSec: 0.005 }, // ~12.5 B/s raw
           max: { label: "MAX 3x", symbolSec: 0.03, rampSec: 0.005 }, // ~16.7 B/s raw — fragile: close range, quiet rooms
@@ -1903,7 +1903,7 @@ NO FRAME RECEIVED YET</pre
           extra = extra || {};
           const prof = PROFILES[profileName || "audible"];
           if (!prof) throw new Error("unknown profile: " + profileName);
-          const spd = SPEEDS[speedName || "robust"];
+          const spd = SPEEDS[speedName || "normal"];
           if (!spd) throw new Error("unknown speed: " + speedName);
           const parity = extra.parity != null ? extra.parity : RS_PARITY;
           if (parity !== 8 && parity !== 16 && parity !== 32)
@@ -1933,7 +1933,7 @@ NO FRAME RECEIVED YET</pre
             fs,
             profile: profileName || "audible",
             prof,
-            speed: speedName || "robust",
+            speed: speedName || "normal",
             symbolSec: spd.symbolSec,
             parity,
             channel,
@@ -1992,7 +1992,7 @@ NO FRAME RECEIVED YET</pre
         function estimateSeconds(payloadLen, speedName, parity) {
           return (
             totalSymbolsFor(payloadLen, parity) *
-              SPEEDS[speedName || "robust"].symbolSec +
+              SPEEDS[speedName || "normal"].symbolSec +
             0.5
           ); // + lead/tail padding
         }
@@ -2332,7 +2332,20 @@ NO FRAME RECEIVED YET</pre
           }
 
           _fail(code) {
-            if (this.cb.onResult) this.cb.onResult({ ok: false, error: code });
+            let minConf = Infinity,
+              sum = 0;
+            for (const c of this.confs) {
+              if (c < minConf) minConf = c;
+              sum += c;
+            }
+            const stats = {
+              minConfDb: this.confs.length ? minConf : 0,
+              avgConfDb: this.confs.length ? sum / this.confs.length : 0,
+              symbols: this.confs.length,
+              rms: this.lastRms,
+            };
+            if (this.cb.onResult)
+              this.cb.onResult({ ok: false, error: code, stats });
             this._setState("FAILED");
             this._toListening();
           }
@@ -3363,7 +3376,7 @@ NO FRAME RECEIVED YET</pre
               );
               const wantProfile = opts.profile || "audible";
               const wantCh = opts.channel || 0;
-              const wantSpeed = opts.speed || "robust";
+              const wantSpeed = opts.speed || "normal";
               const okPayload =
                 !!result && result.ok && bytesEqual(result.payload, MSG50);
               const okDet =
@@ -3390,7 +3403,7 @@ NO FRAME RECEIVED YET</pre
               return { pass: okPayload && okDet, detail };
             });
           };
-          autoTest("AUTO-RX: audible ch A, robust, FEC 32", true, 48000, {});
+          autoTest("AUTO-RX: audible ch A, normal, FEC 32", true, 48000, {});
           autoTest("AUTO-RX: audible ch B, fast, FEC 16", true, 48000, {
             channel: 1,
             speed: "fast",
@@ -3933,7 +3946,7 @@ NO FRAME RECEIVED YET</pre
           if (listening) restartDemod();
           saveState();
         }
-        const SPEED_ORDER = ["robust", "fast", "turbo", "max"];
+        const SPEED_ORDER = ["normal", "fast", "turbo", "max"];
         const FEC_ORDER = [8, 16, 32];
         const speedKnob = makeKnob($("knobSpeed"), {
           detents: [
@@ -4483,6 +4496,7 @@ registerProcessor('airgap-capture', AirgapCapture);`;
                   "\n" +
                   "ERROR    " +
                   (ERRORS[r.error] || r.error) +
+                  rxFailSignal(r.stats) +
                   (liveBuf && liveN
                     ? "\nRAW      " +
                       liveN +
@@ -4495,6 +4509,33 @@ registerProcessor('airgap-capture', AirgapCapture);`;
               liveN = 0;
             },
           };
+        }
+
+        // SIGNAL + HINT lines for the failed-frame inspector dump: symbol
+        // confidence separates a weak signal from a clipped one
+        function rxFailSignal(stats) {
+          if (!stats || !stats.symbols) return "";
+          const lvlDb = 20 * Math.log10(Math.max(stats.rms, 1e-6));
+          let out =
+            "\nSIGNAL   conf min " +
+            stats.minConfDb.toFixed(1) +
+            " dB · avg " +
+            stats.avgConfDb.toFixed(1) +
+            " dB · " +
+            stats.symbols +
+            " symbol(s) read · mic level " +
+            lvlDb.toFixed(0) +
+            " dBFS";
+          if (stats.rms > 0.35 && stats.avgConfDb < 6)
+            out +=
+              "\nHINT     input level is hot — likely clipping; lower the TX volume";
+          else if (stats.avgConfDb < 5)
+            out +=
+              "\nHINT     weak signal — tones barely above the noise; raise volume or move closer";
+          else if (stats.minConfDb < 1)
+            out +=
+              "\nHINT     tones read cleanly but some symbols were ambiguous — check SPEED matches on both ends, try a slower speed, or raise volume";
+          return out;
         }
 
         // link description for the RX frame inspector (auto-detected or manual)
