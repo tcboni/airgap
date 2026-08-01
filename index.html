@@ -776,34 +776,6 @@
       textarea:focus {
         border-color: var(--amber-dim);
       }
-      .filebar {
-        display: flex;
-        gap: 10px;
-        align-items: center;
-        margin-top: 10px;
-        flex-wrap: wrap;
-      }
-      .filechip {
-        display: none;
-        align-items: center;
-        gap: 8px;
-        font-size: 11px;
-        color: var(--amber);
-        border: 1px dashed var(--amber-dim);
-        border-radius: 4px;
-        padding: 5px 10px;
-      }
-      .filechip.show {
-        display: inline-flex;
-      }
-      .filechip button {
-        padding: 1px 7px;
-        font-size: 11px;
-      }
-      input[type="file"] {
-        display: none;
-      }
-
       /* progress + meters */
       .track {
         position: relative;
@@ -1232,24 +1204,10 @@
             >
 Hello across the air gap 📡</textarea
             >
-            <div class="filebar">
-              <button
-                id="txFileBtn"
-                data-tip="Send a small file (up to 8 KB) instead of text. Any bytes work — the receiver auto-detects UTF-8 vs. binary."
-              >
-                ▤ LOAD FILE…
-              </button>
-              <span class="filechip" id="txChip"
-                ><span id="txChipName"></span
-                ><button id="txChipClear" title="clear file">✕</button></span
-              >
-              <input type="file" id="txFile" />
-            </div>
-
             <div class="readouts">
               <div
                 class="ro"
-                data-tip="Exact byte count that will be transmitted: your text as UTF-8, or the loaded file."
+                data-tip="Exact byte count that will be transmitted: your text as UTF-8."
               >
                 <div class="k">PAYLOAD</div>
                 <div class="v" id="txBytes">0 B</div>
@@ -1258,7 +1216,7 @@ Hello across the air gap 📡</textarea
                 class="ro"
                 data-tip="Every frame carries fixed overhead regardless of size: preamble + sync (~9 symbols), an error-protected length header (24 symbols), 8–32 Reed-Solomon parity bytes per block (set by the FEC knob), and a 4-byte CRC-32. That's why even a 1-byte message takes several seconds."
               >
-                <div class="k">EST. AIRTIME</div>
+                <div class="k">AIRTIME</div>
                 <div class="v" id="txDur">—</div>
               </div>
               <div
@@ -1273,7 +1231,7 @@ Hello across the air gap 📡</textarea
             <button
               class="big arm"
               id="txSend"
-              data-tip="Encodes whatever is in the text box (or the loaded file) into sound and plays it — edits are picked up on every press. While on air it becomes ABORT: press again to cut playback."
+              data-tip="Encodes whatever is in the text box into sound and plays it — edits are picked up on every press. While on air it becomes ABORT: press again to cut playback."
             >
               ◉ TRANSMIT
             </button>
@@ -1369,13 +1327,6 @@ Hello across the air gap 📡</textarea
               </div>
               <div
                 class="ro"
-                data-tip="Payload format of the last decode: valid UTF-8 renders as text; anything else shows as a hex dump (DOWNLOAD always gives the exact bytes)."
-              >
-                <div class="k">FORMAT</div>
-                <div class="v" id="rxFmt">—</div>
-              </div>
-              <div
-                class="ro"
                 data-tip="Bytes the Reed-Solomon decoder repaired in the last frame. A health gauge: 0 is a clean channel, numbers near the FEC limit mean you're living on the edge."
               >
                 <div class="k">RS FIXED</div>
@@ -1392,13 +1343,6 @@ Hello across the air gap 📡</textarea
                   data-tip="Copy the decoded UTF-8 text to the clipboard. Disabled when the payload isn't valid text."
                 >
                   ⧉ COPY TEXT
-                </button>
-                <button
-                  id="rxSave"
-                  disabled
-                  data-tip="Save the raw received bytes as airgap-payload.bin — works for any payload, text or binary."
-                >
-                  ▼ DOWNLOAD BYTES
                 </button>
               </div>
               <div
@@ -4012,6 +3956,7 @@ NO FRAME RECEIVED YET</pre
           $("tabRx").setAttribute("aria-selected", m === "rx");
           $("txPanel").classList.toggle("hide", m !== "tx");
           $("rxPanel").classList.toggle("hide", m !== "rx");
+          if (!txPlaying && !listening) clearScope();
           refreshDeckLock();
           saveState();
         }
@@ -4047,8 +3992,6 @@ NO FRAME RECEIVED YET</pre
         on("rxAuto", "click", () => setAutoRx(!autoRx));
 
         // ================= TRANSMIT =================
-        let filePayload = null,
-          fileLabel = "";
         let txSource = null,
           txGain = null,
           txStartAt = 0,
@@ -4056,12 +3999,11 @@ NO FRAME RECEIVED YET</pre
           txPlaying = false;
 
         function currentPayload() {
-          if (filePayload) return filePayload;
           return new TextEncoder().encode($("txText").value);
         }
         function refreshTxInfo() {
           const n = currentPayload().length;
-          $("txBytes").textContent = fmtBytes(n) + (filePayload ? " ▤" : "");
+          $("txBytes").textContent = fmtBytes(n);
           $("txDur").textContent = n
             ? fmtSecs(AirGap.estimateSeconds(n, speedName, fecParity))
             : "—";
@@ -4081,26 +4023,6 @@ NO FRAME RECEIVED YET</pre
           refreshTxInfo();
           saveState();
         });
-        on("txFileBtn", "click", () => $("txFile").click());
-        on("txFile", "change", async () => {
-          const f = $("txFile").files[0];
-          if (!f) return;
-          const buf = new Uint8Array(await f.arrayBuffer());
-          filePayload = buf;
-          fileLabel = f.name;
-          $("txChipName").textContent = f.name + " · " + fmtBytes(buf.length);
-          $("txChip").classList.add("show");
-          log("file loaded: " + f.name + " (" + buf.length + " B)");
-          refreshTxInfo();
-        });
-        on("txChipClear", "click", () => {
-          filePayload = null;
-          fileLabel = "";
-          $("txFile").value = "";
-          $("txChip").classList.remove("show");
-          refreshTxInfo();
-        });
-
         // Outgoing-signal monitor: while transmitting (and not listening), the
         // shared SIGNAL MONITOR panel shows the spectrum of what's playing.
         let txMon = null;
@@ -4141,7 +4063,10 @@ NO FRAME RECEIVED YET</pre
           txPlaying = false;
           txMon = null;
           $("monTag").textContent = listening ? "MIC IN" : "IDLE";
-          if (!listening) setMeters(-100, null);
+          if (!listening) {
+            setMeters(-100, null);
+            clearScope();
+          }
           setTxLeds("ready");
           setTxResult(aborted ? "err" : "ok");
           $("txSend").textContent = "◉ TRANSMIT";
@@ -4248,9 +4173,7 @@ NO FRAME RECEIVED YET</pre
           log(
             "modulating " +
               payload.length +
-              " B (" +
-              (filePayload ? fileLabel : "text") +
-              ") · " +
+              " B · " +
               AirGap.PROFILES[profileName].label,
           );
           // yield one frame so the UI shows state before the (brief) synth burst
@@ -4329,8 +4252,7 @@ NO FRAME RECEIVED YET</pre
         let rxGot = 0,
           rxExpected = 0,
           rxRaf = 0;
-        let lastResultBytes = null,
-          lastResultText = null;
+        let lastResultText = null;
         let liveBuf = null,
           liveN = 0; // raw pre-FEC bytes streamed during PAYLOAD
 
@@ -4457,7 +4379,6 @@ registerProcessor('airgap-capture', AirgapCapture);`;
             },
             onResult: (r) => {
               if (r.ok) {
-                lastResultBytes = r.payload;
                 lastResultText = null;
                 try {
                   lastResultText = new TextDecoder("utf-8", {
@@ -4472,11 +4393,8 @@ registerProcessor('airgap-capture', AirgapCapture);`;
                       r.payload.length +
                       " bytes]\n" +
                       hexPreview(r.payload);
-                $("rxFmt").textContent =
-                  lastResultText !== null ? "UTF-8" : "BINARY";
                 $("rxFix").textContent = r.stats.corrected + " B";
                 $("rxCopy").disabled = lastResultText === null;
-                $("rxSave").disabled = false;
                 setResult("ok");
                 $("rxDump").textContent =
                   "── LAST RX FRAME · " +
@@ -4602,7 +4520,6 @@ registerProcessor('airgap-capture', AirgapCapture);`;
           $("rxBytes").textContent = "—";
           $("rxDur").textContent = "—";
           $("rxRate").textContent = "—";
-          $("rxFmt").textContent = "—";
           $("rxFix").textContent = "—";
           setResult(null);
           if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -4704,7 +4621,10 @@ registerProcessor('airgap-capture', AirgapCapture);`;
           $("rxStart").classList.add("hot");
           $("rxStart").classList.remove("danger");
           $("monTag").textContent = txPlaying ? "SPKR OUT" : "IDLE";
-          if (!txPlaying) setMeters(-100, null);
+          if (!txPlaying) {
+            setMeters(-100, null);
+            clearScope();
+          }
           setLeds("");
           log("listening stopped");
         }
@@ -4747,6 +4667,16 @@ registerProcessor('airgap-capture', AirgapCapture);`;
             $("rxSym").textContent = "SYM —/—";
           }
           rxRaf = requestAnimationFrame(rxAnim);
+        }
+
+        // wipe the monitor to its idle background (the drawScope trace persists
+        // between frames for the phosphor-decay effect, so a stopped scope
+        // would otherwise stay frozen on the last spectrum)
+        function clearScope() {
+          const cv = $("scope");
+          const g = cv.getContext("2d");
+          g.fillStyle = "#060806";
+          g.fillRect(0, 0, cv.width, cv.height);
         }
 
         function drawScope(p, pow) {
@@ -4935,23 +4865,6 @@ registerProcessor('airgap-capture', AirgapCapture);`;
             log("copied to clipboard (fallback)", "g");
           }
         });
-        on("rxSave", "click", () => {
-          if (!lastResultBytes) return;
-          const blob = new Blob([lastResultBytes], {
-            type: "application/octet-stream",
-          });
-          const a = document.createElement("a");
-          a.href = URL.createObjectURL(blob);
-          a.download = "airgap-payload.bin";
-          document.body.appendChild(a);
-          a.click();
-          setTimeout(() => {
-            URL.revokeObjectURL(a.href);
-            a.remove();
-          }, 500);
-          log("payload saved as airgap-payload.bin");
-        });
-
         // ---- boot ----
         setInterval(() => {
           $("logClock").textContent = now();
