@@ -7,7 +7,7 @@
       content="width=device-width, initial-scale=1, viewport-fit=cover"
     />
     <meta name="color-scheme" content="dark" />
-    <title>AIRGAP · ACOUSTIC DATA COUPLER MK-1</title>
+    <title>AIRGAP · MK-1</title>
     <style>
       /* ---- AIRGAP MK-1 · cassette-futurism control panel ---- */
       :root {
@@ -87,15 +87,42 @@
         gap: 0 14px;
         align-items: stretch;
       }
-      .cols .panel {
+      .colmain .panel {
         height: calc(100% - 14px); /* fill the row minus the panel margin */
+      }
+      /* right rail: deck stacked on the signal monitor, which absorbs the
+         leftover height so both columns bottom out together */
+      .colside {
+        display: flex;
+        flex-direction: column;
+      }
+      #monPanel {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+      }
+      #monPanel .scopewrap {
+        flex: 1;
+        display: flex;
+        min-height: 96px;
+        margin-bottom: 8px;
+      }
+      #monPanel .scope {
+        flex: 1;
+        height: auto;
+        min-height: 96px;
       }
       @media (max-width: 940px) {
         .cols {
           grid-template-columns: 1fr;
         }
-        .cols .panel {
+        .colmain .panel {
           height: auto;
+        }
+        #monPanel .scope {
+          height: 120px;
+          flex: none;
+          width: 100%;
         }
       }
 
@@ -723,7 +750,7 @@
       /* text input */
       textarea {
         width: 100%;
-        min-height: 170px; /* matches the receive output area */
+        min-height: 220px; /* matches the receive output area */
         resize: vertical;
         background: #0a0d08;
         color: var(--ink);
@@ -878,8 +905,8 @@
       }
       /* the received message is the receiver's main deliverable — keep it big */
       #rxOut {
-        min-height: 170px;
-        max-height: 320px;
+        min-height: 220px;
+        max-height: 360px;
       }
       /* live raw stream: unverified bytes render amber until FEC + CRC pass */
       pre.out.raw {
@@ -1156,6 +1183,37 @@
               <span class="tag">SPKR OUT</span>
             </div>
 
+            <div class="ledrow">
+              <div
+                class="led g on"
+                id="ledReady"
+                data-tip="Idle — payload staged, ready to encode."
+              >
+                <i></i><span>READY</span>
+              </div>
+              <div
+                class="led a"
+                id="ledEncode"
+                data-tip="Encoding: framing, Reed-Solomon parity and tone synthesis. Quick — it usually just blinks past."
+              >
+                <i></i><span>ENCODE</span>
+              </div>
+              <div
+                class="led a"
+                id="ledOnAir"
+                data-tip="The frame is playing through the speaker."
+              >
+                <i></i><span>ON AIR</span>
+              </div>
+              <div
+                class="led ann"
+                id="annTx"
+                data-tip="Outcome of the last transmission — SENT (played to the end) or ABRT (cut short). Latches until the next send."
+              >
+                <b id="annTxTxt">—</b>
+              </div>
+            </div>
+
             <textarea
               id="txText"
               spellcheck="false"
@@ -1276,6 +1334,30 @@ Hello across the air gap 📡</textarea
               ◉ START LISTENING
             </button>
 
+            <div class="readouts">
+              <div
+                class="ro"
+                data-tip="Incoming payload size, read from the decoded frame header. Fills in the moment the header arrives."
+              >
+                <div class="k">PAYLOAD</div>
+                <div class="v" id="rxBytes">—</div>
+              </div>
+              <div
+                class="ro"
+                data-tip="Total airtime of the incoming frame at its actual settings — known once the header decodes."
+              >
+                <div class="k">AIRTIME</div>
+                <div class="v" id="rxDur">—</div>
+              </div>
+              <div
+                class="ro"
+                data-tip="Symbol rate of the frame being received — detected from the signal when AUTO is on."
+              >
+                <div class="k">SYMBOL RATE</div>
+                <div class="v" id="rxRate">—</div>
+              </div>
+            </div>
+
             <div class="outwrap">
               <div class="outmeta" id="rxMeta">AWAITING TRANSMISSION</div>
               <pre class="out" id="rxOut"></pre>
@@ -1302,30 +1384,6 @@ Hello across the air gap 📡</textarea
                 <div class="track"><div class="fill" id="rxFill"></div></div>
                 <div class="t" id="rxSym">SYM —/—</div>
               </div>
-            </div>
-
-            <div class="subdiv">SIGNAL MONITOR</div>
-            <div
-              class="scopewrap"
-              data-tip="Live spectrum of the receive band. Amber ticks mark the 16 data tone frequencies; red ticks mark the two preamble/sync tones. A transmission shows as a single sharp peak hopping between the ticks."
-            >
-              <canvas class="scope" id="scope"></canvas>
-            </div>
-            <div
-              class="meter"
-              data-tip="Microphone input level (RMS, decaying peak). You want a clear bounce while the sender plays; if it sits pinned at the right edge the input is clipping — move apart or lower the volume."
-            >
-              <span class="k">LVL</span>
-              <div class="track"><div class="fill" id="lvlFill"></div></div>
-              <span class="t" id="lvlTxt">−∞ dB</span>
-            </div>
-            <div
-              class="meter"
-              data-tip="Symbol confidence: power of the strongest tone vs. the runner-up, in dB. Higher is cleaner. Below ~6 dB, symbol errors get likely and the FEC has to work hard."
-            >
-              <span class="k">CNF</span>
-              <div class="track"><div class="fill" id="cnfFill"></div></div>
-              <span class="t" id="cnfTxt">— dB</span>
             </div>
           </section>
         </div>
@@ -1423,6 +1481,38 @@ Hello across the air gap 📡</textarea
                   <div class="kvalue" id="volVal">80%</div>
                 </div>
               </div>
+            </div>
+          </section>
+
+          <!-- ================= SIGNAL MONITOR ================= -->
+          <section class="panel" id="monPanel">
+            <span class="screw tl"></span><span class="screw tr"></span
+            ><span class="screw bl"></span><span class="screw br"></span>
+            <div class="plabel">
+              <b>◤ SIGNAL MONITOR</b>
+              <span class="tag" id="monTag">IDLE</span>
+            </div>
+            <div
+              class="scopewrap"
+              data-tip="Live spectrum. Amber ticks mark the 16 data tone frequencies; red ticks the two preamble/sync tones. While receiving it shows the microphone; while transmitting, the outgoing signal — a single sharp peak hopping between the ticks."
+            >
+              <canvas class="scope" id="scope"></canvas>
+            </div>
+            <div
+              class="meter"
+              data-tip="Signal level (RMS, decaying peak). Receiving: microphone input — you want a clear bounce while the sender plays; pinned at the right edge means clipping. Transmitting: the outgoing level after the VOLUME knob."
+            >
+              <span class="k">LVL</span>
+              <div class="track"><div class="fill" id="lvlFill"></div></div>
+              <span class="t" id="lvlTxt">−∞ dB</span>
+            </div>
+            <div
+              class="meter"
+              data-tip="Symbol confidence: power of the strongest tone vs. the runner-up, in dB, as heard by the decoder. Higher is cleaner; below ~6 dB symbol errors get likely. Reads — while transmitting (your own synthesized signal is always clean)."
+            >
+              <span class="k">CNF</span>
+              <div class="track"><div class="fill" id="cnfFill"></div></div>
+              <span class="t" id="cnfTxt">— dB</span>
             </div>
           </section>
         </aside>
@@ -3839,6 +3929,24 @@ NO FRAME RECEIVED YET</pre
           refreshTxInfo();
         });
 
+        // Outgoing-signal monitor: while transmitting (and not listening), the
+        // shared SIGNAL MONITOR panel shows the spectrum of what's playing.
+        let txMon = null;
+
+        // TX step LEDs + latching SENT/ABRT annunciator
+        function setTxLeds(state) {
+          $("ledReady").classList.toggle("on", state === "ready");
+          $("ledEncode").classList.toggle("on", state === "encode");
+          $("ledOnAir").classList.toggle("on", state === "onair");
+          $("ledOnAir").classList.toggle("blink", state === "onair");
+        }
+        function setTxResult(kind) {
+          $("annTx").classList.toggle("ok", kind === "ok");
+          $("annTx").classList.toggle("err", kind === "err");
+          $("annTxTxt").textContent =
+            kind === "ok" ? "SENT" : kind === "err" ? "ABRT" : "—";
+        }
+
         function stopTx(aborted) {
           if (txSource) {
             try {
@@ -3848,6 +3956,11 @@ NO FRAME RECEIVED YET</pre
           }
           txSource = null;
           txPlaying = false;
+          txMon = null;
+          $("monTag").textContent = listening ? "MIC IN" : "IDLE";
+          if (!listening) setMeters(-100, null);
+          setTxLeds("ready");
+          setTxResult(aborted ? "err" : "ok");
           $("txSend").textContent = "◉ TRANSMIT";
           $("txSend").classList.add("arm");
           $("txSend").classList.remove("danger");
@@ -3855,7 +3968,7 @@ NO FRAME RECEIVED YET</pre
           if (aborted) log("transmission aborted", "r");
         }
 
-        function playSignal(sig) {
+        function playSignal(sig, p) {
           const c = ensureCtx();
           const buf = c.createBuffer(1, sig.length, c.sampleRate);
           buf.getChannelData(0).set(sig);
@@ -3868,6 +3981,16 @@ NO FRAME RECEIVED YET</pre
           txDurSec = sig.length / c.sampleRate;
           txStartAt = c.currentTime;
           txPlaying = true;
+          txMon = {
+            sig,
+            p,
+            win: AirGap.hannWindow(p.fftSize),
+            re: new Float32Array(p.fftSize),
+            im: new Float32Array(p.fftSize),
+            pow: new Float32Array(p.fftSize >> 1),
+          };
+          if (!listening) $("monTag").textContent = "SPKR OUT";
+          setTxLeds("onair");
           $("txSend").textContent = "■ ABORT";
           $("txSend").classList.remove("arm");
           $("txSend").classList.add("danger");
@@ -3891,6 +4014,34 @@ NO FRAME RECEIVED YET</pre
           $("txCap").style.left = pct;
           $("txTime").textContent =
             t.toFixed(1) + " / " + txDurSec.toFixed(1) + " s";
+          // drive the shared monitor from the outgoing samples (the mic owns
+          // the monitor whenever the receiver is listening)
+          if (txMon && !listening) {
+            const m = txMon,
+              N = m.p.fftSize;
+            const pos = Math.floor(t * ctx.sampleRate);
+            const start = Math.max(0, Math.min(pos - (N >> 1), m.sig.length - N));
+            // Normalize by the Hann coherent gain (N/4) so a full-scale tone
+            // lands near the top of the scope instead of clipping far above it
+            // (synth samples are ~1.0; mic samples the scope was scaled for
+            // are much smaller). The extra 0.05 leaves visible headroom.
+            const norm =
+              (0.05 * txVolume * txVolume) / Math.pow(N / 4, 2);
+            for (let n = 0; n < N; n++) {
+              m.re[n] = m.sig[start + n] * m.win[n];
+              m.im[n] = 0;
+            }
+            AirGap.fftInPlace(m.re, m.im);
+            for (let k = 0; k < N >> 1; k++)
+              m.pow[k] = (m.re[k] * m.re[k] + m.im[k] * m.im[k]) * norm;
+            drawScope(m.p, m.pow);
+            let sq = 0;
+            const n0 = Math.max(0, pos - 1024);
+            for (let i = n0; i < Math.min(pos, m.sig.length); i++)
+              sq += m.sig[i] * m.sig[i];
+            const rms = Math.sqrt(sq / Math.max(1, pos - n0)) * txVolume;
+            setMeters(rms > 0 ? 20 * Math.log10(rms) : -100, null);
+          }
           requestAnimationFrame(txAnim);
         }
 
@@ -3899,6 +4050,8 @@ NO FRAME RECEIVED YET</pre
           if (!payload.length || payload.length > AirGap.MAX_PAYLOAD) return;
           const c = ensureCtx();
           await c.resume(); // iOS: must resume inside the gesture
+          setTxLeds("encode");
+          setTxResult(null);
           log(
             "modulating " +
               payload.length +
@@ -3963,7 +4116,7 @@ NO FRAME RECEIVED YET</pre
             " Hz\n\n" +
             hexPreview(payload);
           log("on air · " + fmtSecs(sig.length / c.sampleRate), "a");
-          playSignal(sig);
+          playSignal(sig, p);
         }
         on("txSend", "click", () => (txPlaying ? stopTx(true) : transmit()));
 
@@ -4061,6 +4214,17 @@ registerProcessor('airgap-capture', AirgapCapture);`;
                 );
                 liveBuf = new Uint8Array(demod.payloadLen);
                 liveN = 0;
+                // readout tiles snap from — to the header's real values
+                $("rxBytes").textContent = fmtBytes(demod.payloadLen);
+                $("rxDur").textContent = fmtSecs(
+                  AirGap.estimateSeconds(
+                    demod.payloadLen,
+                    demod.p.speed,
+                    demod.rxParity,
+                  ),
+                );
+                $("rxRate").textContent =
+                  (1 / demod.p.symbolSec).toFixed(1) + "/s";
                 $("rxOut").classList.remove("err"); // new frame resets error state
                 $("rxOut").classList.add("raw");
                 $("rxOut").textContent = "▌";
@@ -4247,6 +4411,9 @@ registerProcessor('airgap-capture', AirgapCapture);`;
             $("rxOut").textContent = "";
             $("rxMeta").textContent = "AWAITING TRANSMISSION";
           }
+          $("rxBytes").textContent = "—";
+          $("rxDur").textContent = "—";
+          $("rxRate").textContent = "—";
           setResult(null);
           if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             micFail("MICROPHONE API UNAVAILABLE — use HTTPS or localhost");
@@ -4313,6 +4480,7 @@ registerProcessor('airgap-capture', AirgapCapture);`;
           $("rxStart").textContent = "■ STOP LISTENING";
           $("rxStart").classList.remove("hot");
           $("rxStart").classList.add("danger");
+          $("monTag").textContent = "MIC IN";
           log(
             "listening (" +
               (usingWorklet ? "AudioWorklet" : "ScriptProcessor fallback") +
@@ -4345,6 +4513,8 @@ registerProcessor('airgap-capture', AirgapCapture);`;
           $("rxStart").textContent = "◉ START LISTENING";
           $("rxStart").classList.add("hot");
           $("rxStart").classList.remove("danger");
+          $("monTag").textContent = txPlaying ? "SPKR OUT" : "IDLE";
+          if (!txPlaying) setMeters(-100, null);
           setLeds("");
           log("listening stopped");
         }
@@ -4361,19 +4531,24 @@ registerProcessor('airgap-capture', AirgapCapture);`;
         }
 
         // ---- RX visualization ----
-        function rxAnim() {
-          if (!listening) return;
-          drawScope();
-          const rmsDb =
-            demod && demod.lastRms > 0 ? 20 * Math.log10(demod.lastRms) : -100;
+        // shared LVL / CNF meters (CNF is decoder-only: null while transmitting)
+        function setMeters(rmsDb, confDb) {
           $("lvlFill").style.width =
             Math.max(0, Math.min(100, ((rmsDb + 60) / 60) * 100)) + "%";
           $("lvlTxt").textContent =
             (rmsDb <= -99 ? "−∞" : rmsDb.toFixed(0)) + " dB";
-          const conf = demod ? demod.lastConfDb : 0;
           $("cnfFill").style.width =
-            Math.max(0, Math.min(100, (conf / 30) * 100)) + "%";
-          $("cnfTxt").textContent = conf ? conf.toFixed(1) + " dB" : "— dB";
+            confDb ? Math.max(0, Math.min(100, (confDb / 30) * 100)) + "%" : "0%";
+          $("cnfTxt").textContent = confDb ? confDb.toFixed(1) + " dB" : "— dB";
+        }
+
+        function rxAnim() {
+          if (!listening) return;
+          drawScope(demod && demod.p, demod && demod.pow);
+          setMeters(
+            demod && demod.lastRms > 0 ? 20 * Math.log10(demod.lastRms) : -100,
+            demod ? demod.lastConfDb : 0,
+          );
           if (rxExpected) {
             $("rxFill").style.width =
               ((rxGot / rxExpected) * 100).toFixed(1) + "%";
@@ -4385,7 +4560,7 @@ registerProcessor('airgap-capture', AirgapCapture);`;
           rxRaf = requestAnimationFrame(rxAnim);
         }
 
-        function drawScope() {
+        function drawScope(p, pow) {
           const cv = $("scope");
           const dpr = window.devicePixelRatio || 1;
           const w = cv.clientWidth * dpr,
@@ -4397,9 +4572,7 @@ registerProcessor('airgap-capture', AirgapCapture);`;
           const g = cv.getContext("2d");
           g.fillStyle = "rgba(6,8,6,0.45)"; // phosphor decay
           g.fillRect(0, 0, w, h);
-          if (!demod) return;
-          const p = demod.p,
-            pow = demod.pow;
+          if (!p || !pow) return;
           const lo = p.bandLo,
             hi = p.bandHi,
             nb = hi - lo + 1;
