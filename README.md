@@ -20,7 +20,7 @@ Send short text messages between nearby devices using sound — no network, no p
   then the payload (up to 8 KB of UTF-8 text) chunked into RS blocks with
   selectable parity (FEC LOW/MED/HIGH) and a CRC-32 trailer.
 - **Bands** — an audible profile (~1.5–5 kHz, three channels A/B/C) and
-  an ultrasonic profile (~16–19 kHz). Four speed presets trade robustness
+  an ultrasonic profile (~16–19 kHz). Four speed presets trade reliability
   for throughput (~5.5 to ~16.7 B/s raw).
 - **Receiver** — FFT-based demodulator with early/late gate clock
   tracking, phase refinement at lock, and header decode retries; the FEC
