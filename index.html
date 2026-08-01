@@ -327,10 +327,20 @@
       /* ---- control deck: rotary knobs ---- */
       .deck {
         display: flex;
-        gap: 12px 22px;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .deckrow {
+        display: flex;
+        gap: 12px 16px;
         align-items: stretch; /* units share top/bottom lines */
         flex-wrap: wrap;
         justify-content: center;
+      }
+      /* deck greys out while the receiver is in auto-detect */
+      .panel.locked .deck {
+        opacity: 0.4;
+        pointer-events: none;
       }
       .knobunit {
         display: flex;
@@ -354,7 +364,7 @@
       }
       .knob {
         position: relative;
-        width: 112px;
+        width: 104px;
         height: 100px;
         margin: 0 auto;
         touch-action: none;
@@ -482,6 +492,57 @@
       }
       .pushsw button.pressed small {
         color: var(--amber-dim);
+      }
+
+      /* RX start row: big listen button + latching AUTO-detect key */
+      .rxstartrow {
+        display: flex;
+        gap: 10px;
+        align-items: stretch;
+      }
+      .rxstartrow .big {
+        flex: 1;
+        width: auto;
+      }
+      #rxAuto {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 3px;
+        min-width: 92px;
+        padding: 8px 14px;
+        font-size: 12px;
+        letter-spacing: 0.14em;
+        border-radius: 3px;
+        background: linear-gradient(180deg, #20251c, #14180f);
+        border: 1px solid #363d31;
+        border-bottom: 3px solid #0c0e0a;
+        box-shadow:
+          0 3px 0 #000,
+          inset 0 1px 0 rgba(255, 255, 255, 0.07);
+        color: var(--dim);
+      }
+      #rxAuto small {
+        font-size: 8px;
+        letter-spacing: 0.06em;
+        text-transform: none;
+        color: var(--faint);
+      }
+      #rxAuto.pressed {
+        transform: translateY(2px);
+        background: linear-gradient(180deg, #0e2415, #09190e);
+        border-bottom-width: 1px;
+        border-color: var(--green-dim);
+        box-shadow:
+          0 1px 0 #000,
+          inset 0 2px 6px rgba(0, 0, 0, 0.7),
+          0 0 12px rgba(92, 240, 140, 0.12);
+        color: var(--green);
+        text-shadow: 0 0 8px rgba(92, 240, 140, 0.5);
+      }
+      #rxAuto.pressed small {
+        color: var(--green-dim);
       }
 
       /* LEDs */
@@ -770,6 +831,27 @@
       pre.out.raw {
         color: var(--amber);
         text-shadow: 0 0 6px rgba(255, 176, 32, 0.25);
+      }
+      /* frame inspector dumps (diagnostics) */
+      .inspwrap {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin-top: 12px;
+      }
+      @media (max-width: 700px) {
+        .inspwrap {
+          grid-template-columns: 1fr;
+        }
+      }
+      pre.insp {
+        font-size: 11px;
+        max-height: 280px;
+        color: var(--dim);
+        text-shadow: none;
+      }
+      pre.insp.amber {
+        color: var(--amber-dim);
       }
       .outmeta {
         font-size: 10px;
@@ -1128,13 +1210,22 @@ Hello across the air gap 📡</textarea
               </div>
             </div>
 
-            <button
-              class="big hot"
-              id="rxStart"
-              data-tip="Opens the microphone raw — echo cancellation, noise suppression and auto-gain are disabled so browser processing can't mangle the signal."
-            >
-              ◉ START LISTENING
-            </button>
+            <div class="rxstartrow">
+              <button
+                class="big hot"
+                id="rxStart"
+                data-tip="Opens the microphone raw — echo cancellation, noise suppression and auto-gain are disabled so browser processing can't mangle the signal."
+              >
+                ◉ START LISTENING
+              </button>
+              <button
+                id="rxAuto"
+                aria-pressed="false"
+                data-tip="Auto-detect: the receiver scans every band, channel and speed at once, and FEC always arrives in the frame header. No manual matching — the control deck then only matters for transmitting."
+              >
+                AUTO<small>DETECT</small>
+              </button>
+            </div>
 
             <div
               class="scopewrap"
@@ -1159,14 +1250,6 @@ Hello across the air gap 📡</textarea
               <span class="t" id="cnfTxt">— dB</span>
             </div>
 
-            <div
-              class="trackrow"
-              data-tip="SYM = payload progress in symbols: received / expected. Each byte takes two symbols (one per 4-bit nibble), including FEC parity bytes."
-            >
-              <div class="track"><div class="fill" id="rxFill"></div></div>
-              <div class="t" id="rxSym">SYM —/—</div>
-            </div>
-
             <div class="outwrap">
               <div class="outmeta" id="rxMeta">AWAITING TRANSMISSION</div>
               <pre class="out" id="rxOut"></pre>
@@ -1187,6 +1270,13 @@ Hello across the air gap 📡</textarea
                 </button>
               </div>
               <div
+                class="trackrow"
+                data-tip="SYM = payload progress in symbols: received / expected. Each byte takes two symbols (one per 4-bit nibble), including FEC parity bytes."
+              >
+                <div class="track"><div class="fill" id="rxFill"></div></div>
+                <div class="t" id="rxSym">SYM —/—</div>
+              </div>
+              <div
                 class="errbox"
                 id="rxErr"
                 data-tip="Sticky: the last error stays here until a frame decodes successfully or you restart listening."
@@ -1201,12 +1291,13 @@ Hello across the air gap 📡</textarea
             ><span class="screw bl"></span><span class="screw br"></span>
             <div class="plabel">
               <b>◤ CONTROL DECK</b>
-              <span class="tag">MATCH ON BOTH ENDS</span>
+              <span class="tag" id="deckTag">MATCH ON BOTH ENDS</span>
             </div>
             <div class="deck">
+              <div class="deckrow">
               <div
                 class="knobunit"
-                data-tip="Carrier band for the 16 data tones. Press to switch — the buttons latch like a real radio. Both devices must be set to the same band. Ultrasonic is near-silent to most adults but needs decent speakers and mics — many phones roll off above 18 kHz."
+                data-tip="Carrier band for the 16 data tones. Press to switch — the buttons latch like a real radio. Both devices must be set to the same band (or enable AUTO on the receiver). Ultrasonic is near-silent to most adults but needs decent speakers and mics — many phones roll off above 18 kHz."
               >
                 <div class="klabel">BAND</div>
                 <div class="pushsw" role="radiogroup" aria-label="Band">
@@ -1247,9 +1338,11 @@ Hello across the air gap 📡</textarea
                 </div>
                 <div class="kvalue" id="chVal">A · 1.9 kHz</div>
               </div>
+              </div>
+              <div class="deckrow">
               <div
                 class="knobunit"
-                data-tip="Symbol duration — the speed vs. robustness trade-off. 1× = 90 ms symbols, 1.5× = 60 ms, 2.25× = 40 ms, 3× = 30 ms. Faster symbols carry less energy, so less range and noise margin — 3× wants close range and a quiet room. Click or drag to aim. Both devices must use the same speed."
+                data-tip="Symbol duration — the speed vs. robustness trade-off. 1× = 90 ms symbols, 1.5× = 60 ms, 2.25× = 40 ms, 3× = 30 ms. Faster symbols carry less energy, so less range and noise margin — 3× wants close range and a quiet room. Click or drag to aim. Both devices must use the same speed (or enable AUTO on the receiver)."
               >
                 <div class="klabel">SPEED</div>
                 <div id="knobSpeed"></div>
@@ -1257,7 +1350,7 @@ Hello across the air gap 📡</textarea
               </div>
               <div
                 class="knobunit"
-                data-tip="Forward error correction strength: Reed-Solomon parity bytes per 223-byte block. LOW = 8 (repairs up to 4 corrupted bytes per block), MED = 16 (repairs 8), HIGH = 32 (repairs 16). More parity means longer airtime but a much tougher signal. Must match on both ends."
+                data-tip="Forward error correction strength: Reed-Solomon parity bytes per 223-byte block. LOW = 8 (repairs up to 4 corrupted bytes per block), MED = 16 (repairs 8), HIGH = 32 (repairs 16). More parity means longer airtime but a much tougher signal. Transmit-side setting — the receiver reads it from the frame header automatically."
               >
                 <div class="klabel">FEC</div>
                 <div id="knobFec"></div>
@@ -1270,6 +1363,7 @@ Hello across the air gap 📡</textarea
                 <div class="klabel">VOLUME</div>
                 <div id="knobVol"></div>
                 <div class="kvalue" id="volVal">80%</div>
+              </div>
               </div>
             </div>
           </section>
@@ -1328,13 +1422,30 @@ Hello across the air gap 📡</textarea
           <span id="diagBadge"></span>
         </div>
         <div class="diagout" id="diagOut"></div>
+        <div class="inspwrap">
+          <pre
+            class="out insp amber"
+            id="txDump"
+            data-tip="Frame inspector: the full anatomy of the last transmitted frame — link settings, tone frequencies, header bytes, RS block layout, symbol count and a payload hex dump."
+          >
+NO FRAME TRANSMITTED YET</pre
+          >
+          <pre
+            class="out insp"
+            id="rxDump"
+            data-tip="Frame inspector: everything decoded from the last received frame — detected link settings, header fields (length + FEC), Reed-Solomon corrections, confidence stats, CRC check and payload hex dump."
+          >
+NO FRAME RECEIVED YET</pre
+          >
+        </div>
       </section>
 
       <div class="hint">
         <b>FIELD MANUAL:</b> HOLD DEVICES 30 CM – 1 M APART · RAISE VOLUME ·
         QUIET ROOM HELPS<br />
-        MATCH BAND · CHANNEL · SPEED · FEC ON BOTH ENDS · ULTRASONIC IS
-        HARDWARE-DEPENDENT · HOVER ANY CONTROL FOR HELP
+        MATCH BAND · CHANNEL · SPEED ON BOTH ENDS — OR PRESS AUTO ON THE
+        RECEIVER · ULTRASONIC IS HARDWARE-DEPENDENT · HOVER ANY CONTROL FOR
+        HELP
       </div>
       <footer>
         SINGLE FILE · WORKS OFFLINE · ADD ?selftest TO URL FOR FULL DIAGNOSTIC
@@ -1750,6 +1861,9 @@ Hello across the air gap 📡</textarea
           ); // + lead/tail padding
         }
 
+        const FEC_CODES = { 8: 0, 16: 1, 32: 2 }; // header fecCode <-> parity
+        const FEC_FROM_CODE = [8, 16, 32];
+
         // header: [len_hi, len_lo, crc16_hi, crc16_lo] + 8 RS parity = 12 bytes
         // (the header always uses HDR_PARITY so it decodes before the payload
         // FEC setting is known)
@@ -1777,7 +1891,10 @@ Hello across the air gap 📡</textarea
             );
           }
           const hdrPlain = new Uint8Array(4);
-          hdrPlain[0] = (payload.length >> 8) & 0xff;
+          // len needs 14 bits (MAX_PAYLOAD 8192); the top 2 bits of the length
+          // field carry the FEC setting so the receiver never has to match it
+          hdrPlain[0] =
+            (FEC_CODES[parity] << 6) | ((payload.length >> 8) & 0x3f);
           hdrPlain[1] = payload.length & 0xff;
           const hc = crc16(hdrPlain.subarray(0, 2));
           hdrPlain[2] = (hc >> 8) & 0xff;
@@ -1884,6 +2001,7 @@ Hello across the air gap 📡</textarea
             this.missTicks = 0;
             this.hdrCorrected = 0;
             this.payloadLen = 0;
+            this.rxParity = RS_PARITY;
             this.symCenter = 0;
             this.nextHop = Math.max(this.total, this.p.fftSize);
             this._setState("LISTENING");
@@ -2175,10 +2293,12 @@ Hello across the air gap 📡</textarea
               return;
             }
             const d = dec.data;
-            const len = (d[0] << 8) | d[1];
+            const fecCode = d[0] >> 6;
+            const len = ((d[0] & 0x3f) << 8) | d[1];
             const crc = (d[2] << 8) | d[3];
             if (
               crc16(d.subarray(0, 2)) !== crc ||
+              fecCode === 3 ||
               len < 1 ||
               len > MAX_PAYLOAD
             ) {
@@ -2186,9 +2306,10 @@ Hello across the air gap 📡</textarea
               return;
             }
             this.payloadLen = len;
+            this.rxParity = FEC_FROM_CODE[fecCode]; // sender's FEC, from header
             this.hdrCorrected = dec.corrected;
             this.nibbles = [];
-            this.expected = bodyLengthFor(len, this.p.parity) * 2;
+            this.expected = bodyLengthFor(len, this.rxParity) * 2;
             // wire-position -> payload-byte-index map (-1 = RS parity or CRC-32
             // trailer) so the UI can stream raw bytes live, before FEC runs
             const map = [];
@@ -2200,7 +2321,7 @@ Hello across the air gap 📡</textarea
                 map.push(dataIdx < len ? dataIdx : -1);
                 dataIdx++;
               }
-              for (let i = 0; i < this.p.parity; i++) map.push(-1);
+              for (let i = 0; i < this.rxParity; i++) map.push(-1);
               remaining -= k;
             }
             this.liveMap = map;
@@ -2216,8 +2337,8 @@ Hello across the air gap 📡</textarea
             while (remaining > 0) {
               const k = Math.min(RS_DATA, remaining);
               const dec = rsDecode(
-                bytes.subarray(off, off + k + this.p.parity),
-                this.p.parity,
+                bytes.subarray(off, off + k + this.rxParity),
+                this.rxParity,
               );
               if (!dec) {
                 this._fail("RS_FAIL");
@@ -2225,7 +2346,7 @@ Hello across the air gap 📡</textarea
               }
               chunks.push(dec.data);
               corrected += dec.corrected;
-              off += k + this.p.parity;
+              off += k + this.rxParity;
               remaining -= k;
             }
             const withCrc = concatBytes(chunks);
@@ -2256,6 +2377,249 @@ Hello across the air gap 📡</textarea
               this.cb.onResult({ ok: true, payload, stats });
             this._setState("DONE");
             this._toListening();
+          }
+        }
+
+        // ---- Auto-detecting receiver ----
+        //
+        // Scans every candidate tone plan (band x channel) at once, measures
+        // the preamble's alternation period to identify the speed preset, then
+        // spins up a real Demodulator with the detected settings and replays
+        // the buffered audio into it. FEC needs no detection — it travels in
+        // the frame header.
+        class AutoDemodulator {
+          constructor(fs, cb) {
+            this.fs = fs;
+            this.cb = cb || {};
+            this.fftSize = 1024;
+            this.hopSize = 128; // fine-grained so 30 ms vs 40 ms symbols separate
+            this.win = hannWindow(this.fftSize);
+            this.re = new Float32Array(this.fftSize);
+            this.im = new Float32Array(this.fftSize);
+            this._pow = new Float32Array(this.fftSize >> 1);
+            let capBits = 15;
+            while (1 << capBits < fs * 2) capBits++; // ~2 s rolling buffer
+            this.cap = 1 << capBits;
+            this.mask = this.cap - 1;
+            this.buf = new Float32Array(this.cap);
+            this.total = 0;
+            this.nextHop = this.fftSize;
+            this.lastRms = 0;
+            this.detected = null;
+            this.inner = null;
+            this.innerIdle = 0;
+            this.dropAfterResult = false;
+
+            const binOf = (f) => Math.round((f * this.fftSize) / fs);
+            this.plans = [];
+            for (const profile of Object.keys(PROFILES)) {
+              const prof = PROFILES[profile];
+              const nCh = profile === "audible" ? 3 : 1;
+              for (let ch = 0; ch < nCh; ch++) {
+                const off = CHANNEL_OFFSETS[profile][ch];
+                const hiF = Math.max(prof.fp1, prof.f0 + 15 * prof.df) + off;
+                if (hiF >= (fs / 2) * 0.98) continue;
+                this.plans.push({
+                  profile,
+                  channel: ch,
+                  b0: binOf(prof.fp0 + off),
+                  b1: binOf(prof.fp1 + off),
+                  hist: [],
+                });
+              }
+            }
+            this.speedList = Object.keys(SPEEDS).map((name) => ({
+              name,
+              len: Math.round(SPEEDS[name].symbolSec * fs),
+            }));
+            this.maxSymbolLen = Math.max(...this.speedList.map((s) => s.len));
+            // synthetic display params while scanning (full band, no ticks)
+            this._p = {
+              fs,
+              fftSize: this.fftSize,
+              bandLo: 1,
+              bandHi: (this.fftSize >> 1) - 2,
+              dataBins: [],
+              binP0: -999,
+              binP1: -999,
+              symbolLen: 1,
+              parity: RS_PARITY,
+            };
+            this.state = "LISTENING";
+          }
+
+          // UI reads these; proxy to the inner demodulator once it exists
+          get p() {
+            return this.inner ? this.inner.p : this._p;
+          }
+          get pow() {
+            return this.inner ? this.inner.pow : this._pow;
+          }
+          get lastConfDb() {
+            return this.inner ? this.inner.lastConfDb : 0;
+          }
+          get payloadLen() {
+            return this.inner ? this.inner.payloadLen : 0;
+          }
+          get expected() {
+            return this.inner ? this.inner.expected : 0;
+          }
+          get rxParity() {
+            return this.inner ? this.inner.rxParity : RS_PARITY;
+          }
+
+          push(chunk) {
+            let sq = 0;
+            for (let i = 0; i < chunk.length; i++) {
+              this.buf[this.total & this.mask] = chunk[i];
+              this.total++;
+              sq += chunk[i] * chunk[i];
+            }
+            if (chunk.length) {
+              const rms = Math.sqrt(sq / chunk.length);
+              this.lastRms = Math.max(rms, this.lastRms * 0.85);
+            }
+            if (this.inner) {
+              this.inner.push(chunk);
+              this._watchInner(chunk.length);
+              return;
+            }
+            let guard = 0;
+            while (this.nextHop <= this.total && guard++ < 4096) {
+              this._scanHop();
+              if (this.inner) return; // locked mid-drain
+            }
+          }
+
+          _watchInner(n) {
+            if (this.dropAfterResult || this.inner.state === "LISTENING") {
+              this.innerIdle += n;
+              // nothing decoding for a while: go back to wide-band scanning
+              if (this.innerIdle > this.fs * 2.5 || this.dropAfterResult) {
+                if (
+                  this.dropAfterResult ||
+                  this.inner.state === "LISTENING"
+                ) {
+                  this.inner = null;
+                  this.dropAfterResult = false;
+                  this.detected = null;
+                  for (const pl of this.plans) pl.hist = [];
+                  this.nextHop = this.total;
+                  this.state = "LISTENING";
+                  if (this.cb.onState) this.cb.onState("LISTENING");
+                }
+              }
+            } else {
+              this.innerIdle = 0;
+            }
+          }
+
+          _scanHop() {
+            const half = this.fftSize >> 1;
+            const start = this.nextHop - this.fftSize;
+            for (let n = 0; n < this.fftSize; n++) {
+              this.re[n] = this.buf[(start + n) & this.mask] * this.win[n];
+              this.im[n] = 0;
+            }
+            fftInPlace(this.re, this.im);
+            const pow = this._pow;
+            for (let k = 0; k < half; k++)
+              pow[k] = this.re[k] * this.re[k] + this.im[k] * this.im[k];
+            // broadband noise floor
+            const sorted = Array.from(pow.subarray(1, half - 1)).sort(
+              (a, b) => a - b,
+            );
+            const floor = Math.max(sorted[sorted.length >> 1], 1e-10);
+            const center = this.nextHop - half;
+            const tone = (b) => pow[b - 1] + pow[b] + pow[b + 1];
+            for (const pl of this.plans) {
+              const p0 = tone(pl.b0);
+              const p1 = tone(pl.b1);
+              let cls = -1;
+              if (p0 > TONE_THR * floor && p0 > DOM_THR * p1) cls = 0;
+              else if (p1 > TONE_THR * floor && p1 > DOM_THR * p0) cls = 1;
+              pl.hist.push({ t: center, cls });
+              if (pl.hist.length > 220) pl.hist.shift();
+              if (this._tryLockPlan(pl)) break;
+            }
+            this.nextHop += this.hopSize;
+          }
+
+          _tryLockPlan(pl) {
+            const runs = [];
+            for (const h of pl.hist) {
+              const last = runs[runs.length - 1];
+              if (last && last.cls === h.cls) {
+                last.tEnd = h.t;
+                last.n++;
+              } else runs.push({ cls: h.cls, tStart: h.t, tEnd: h.t, n: 1 });
+            }
+            const tone = runs.filter((r) => r.cls >= 0 && r.n >= 2);
+            const bounds = [];
+            for (let i = 1; i < tone.length; i++) {
+              const a = tone[i - 1],
+                b = tone[i];
+              if (a.cls === b.cls) continue;
+              const gap = b.tStart - a.tEnd;
+              if (gap < 0 || gap > this.maxSymbolLen * 0.8) continue;
+              bounds.push((a.tEnd + b.tStart) / 2);
+            }
+            if (bounds.length < 3) return false;
+            const d1 = bounds[bounds.length - 1] - bounds[bounds.length - 2];
+            const d2 = bounds[bounds.length - 2] - bounds[bounds.length - 3];
+            if (Math.abs(d1 - d2) > 0.2 * Math.max(d1, d2)) return false;
+            const d = (d1 + d2) / 2;
+            let best = null,
+              bestErr = 0.2; // nearest preset within 20 %
+            for (const s of this.speedList) {
+              const err = Math.abs(d - s.len) / s.len;
+              if (err < bestErr) {
+                bestErr = err;
+                best = s;
+              }
+            }
+            if (!best) return false;
+            this._lock(pl, best.name);
+            return true;
+          }
+
+          _lock(pl, speedName) {
+            this.detected = {
+              profile: pl.profile,
+              channel: pl.channel,
+              speed: speedName,
+            };
+            if (this.cb.onAutoLock) this.cb.onAutoLock(this.detected);
+            const fwd = this.cb;
+            this.inner = new Demodulator(
+              this.fs,
+              pl.profile,
+              {
+                onState: (s) => {
+                  this.state = s;
+                  if (fwd.onState) fwd.onState(s);
+                },
+                onProgress: fwd.onProgress,
+                onLiveByte: fwd.onLiveByte,
+                onResult: (r) => {
+                  this.dropAfterResult = true; // rescan for the next frame
+                  if (fwd.onResult) fwd.onResult(r);
+                },
+              },
+              speedName,
+              { channel: pl.channel },
+            );
+            this.innerIdle = 0;
+            // replay the rolling buffer so the inner demod sees the preamble
+            const avail = Math.min(this.total, this.cap);
+            const startAbs = this.total - avail;
+            const tmp = new Float32Array(4096);
+            for (let off = 0; off < avail; off += tmp.length) {
+              const n = Math.min(tmp.length, avail - off);
+              for (let i = 0; i < n; i++)
+                tmp[i] = this.buf[(startAbs + off + i) & this.mask];
+              this.inner.push(n === tmp.length ? tmp : tmp.subarray(0, n));
+            }
           }
         }
 
@@ -2335,6 +2699,40 @@ Hello across the air gap 📡</textarea
           }
           d.push(new Float32Array(Math.round(fs * 0.3)));
           return { result, seconds: sig.length / fs };
+        }
+
+        // Like loopback(), but received through the auto-detecting demodulator
+        function autoLoopback(payload, fs, opts) {
+          opts = opts || {};
+          const extra = { parity: opts.parity, channel: opts.channel };
+          const p = makeParams(
+            fs,
+            opts.profile || "audible",
+            opts.speed,
+            extra,
+          );
+          let sig = modulate(payload, p, { amplitude: 0.8 });
+          if (opts.snrDb != null) {
+            const rand = mulberry32(opts.seed || 0xa1b2c3);
+            const noiseRms = rmsOf(sig) / Math.pow(10, opts.snrDb / 20);
+            for (let i = 0; i < sig.length; i++)
+              sig[i] += gaussian(rand) * noiseRms;
+          }
+          let result = null,
+            detected = null;
+          const d = new AutoDemodulator(fs, {
+            onResult: (r) => {
+              if (!result) result = r;
+            },
+            onAutoLock: (det) => {
+              if (!detected) detected = det;
+            },
+          });
+          for (let off = 0; off < sig.length; off += 1024) {
+            d.push(sig.subarray(off, Math.min(off + 1024, sig.length)));
+          }
+          d.push(new Float32Array(Math.round(fs * 0.3)));
+          return { result, detected, seconds: sig.length / fs };
         }
 
         function bytesEqual(a, b) {
@@ -2642,6 +3040,93 @@ Hello across the air gap 📡</textarea
           );
 
           test(
+            "FEC travels in the header (TX 8 parity, RX unconfigured)",
+            true,
+            () => {
+              const p8 = makeParams(48000, "audible", "fast", { parity: 8 });
+              const sig = modulate(MSG50, p8, { amplitude: 0.8 });
+              let result = null;
+              const d = new Demodulator(
+                48000,
+                "audible",
+                {
+                  onResult: (r) => {
+                    if (!result) result = r;
+                  },
+                },
+                "fast",
+              );
+              for (let off = 0; off < sig.length; off += 1024)
+                d.push(sig.subarray(off, Math.min(off + 1024, sig.length)));
+              d.push(new Float32Array(14400));
+              const pass =
+                !!result && result.ok && bytesEqual(result.payload, MSG50);
+              return {
+                pass,
+                detail: pass
+                  ? "decoded with rxParity=8 taken from header"
+                  : "failed",
+              };
+            },
+          );
+
+          const autoTest = (name, hard, fs, opts) => {
+            test(name, hard, () => {
+              const { result, detected, seconds } = autoLoopback(
+                MSG50,
+                fs,
+                opts,
+              );
+              const wantProfile = opts.profile || "audible";
+              const wantCh = opts.channel || 0;
+              const wantSpeed = opts.speed || "robust";
+              const okPayload =
+                !!result && result.ok && bytesEqual(result.payload, MSG50);
+              const okDet =
+                !!detected &&
+                detected.profile === wantProfile &&
+                detected.channel === wantCh &&
+                detected.speed === wantSpeed;
+              const detail =
+                okPayload && okDet
+                  ? "detected " +
+                    detected.profile +
+                    " ch" +
+                    "ABC"[detected.channel] +
+                    " " +
+                    detected.speed +
+                    " · " +
+                    seconds.toFixed(1) +
+                    "s"
+                  : !detected
+                    ? "no auto-lock"
+                    : !okDet
+                      ? "wrong detection: " + JSON.stringify(detected)
+                      : "payload failed: " + (result ? result.error : "none");
+              return { pass: okPayload && okDet, detail };
+            });
+          };
+          autoTest("AUTO-RX: audible ch A, robust, FEC 32", true, 48000, {});
+          autoTest("AUTO-RX: audible ch B, fast, FEC 16", true, 48000, {
+            channel: 1,
+            speed: "fast",
+            parity: 16,
+          });
+          autoTest(
+            "AUTO-RX: audible ch C, turbo, FEC 8 + noise 15 dB",
+            true,
+            48000,
+            { channel: 2, speed: "turbo", parity: 8, snrDb: 15 },
+          );
+          autoTest("AUTO-RX: ultrasonic, fast @ 44100 Hz", true, 44100, {
+            profile: "ultrasonic",
+            speed: "fast",
+          });
+          autoTest("AUTO-RX: audible ch A, MAX 3x", true, 48000, {
+            speed: "max",
+          });
+
+          test(
             "Live byte stream matches payload (clean loopback)",
             true,
             () => {
@@ -2714,7 +3199,9 @@ Hello across the air gap 📡</textarea
           frameSymbolFreqs,
           modulate,
           Demodulator,
+          AutoDemodulator,
           loopback,
+          autoLoopback,
           resampleLinear,
           mulberry32,
           bytesEqual,
@@ -2737,6 +3224,7 @@ Hello across the air gap 📡</textarea
         let fecParity = 32; // HIGH — RS parity bytes per block (protocol param)
         let channelIdx = 0; // A/B/C tone-plan offset (protocol param)
         let txVolume = 0.8; // local output level
+        let autoRx = false; // receiver auto-detects band/channel/speed
         let mode = "tx";
         // Starts true so boot-time setter calls can't clobber the saved state;
         // flipped false once restoreState() has finished applying it.
@@ -2756,6 +3244,7 @@ Hello across the air gap 📡</textarea
                 parity: fecParity,
                 channel: channelIdx,
                 volume: txVolume,
+                auto: autoRx,
                 text: $("txText").value,
               }),
             );
@@ -2766,6 +3255,23 @@ Hello across the air gap 📡</textarea
         function fmtBytes(n) {
           if (n < 1024) return n + " B";
           return (n / 1024).toFixed(n < 10240 ? 2 : 1) + " KB";
+        }
+        function hex8(v) {
+          return (v >>> 0).toString(16).padStart(8, "0").toUpperCase();
+        }
+        function hexBytes(b) {
+          return Array.from(b, (x) => x.toString(16).padStart(2, "0")).join(" ");
+        }
+        function linkDesc(profile, ch, speed, parity) {
+          return (
+            AirGap.PROFILES[profile].label +
+            " · CH " +
+            "ABC"[ch] +
+            " · " +
+            AirGap.SPEEDS[speed].label +
+            " · FEC " +
+            parity
+          );
         }
         function fmtSecs(s) {
           return s >= 60
@@ -3175,10 +3681,35 @@ Hello across the air gap 📡</textarea
           $("tabRx").setAttribute("aria-selected", m === "rx");
           $("txPanel").classList.toggle("hide", m !== "tx");
           $("rxPanel").classList.toggle("hide", m !== "rx");
+          refreshDeckLock();
           saveState();
         }
         on("tabTx", "click", () => setMode("tx"));
         on("tabRx", "click", () => setMode("rx"));
+
+        // ---- receiver auto-detect toggle ----
+        function refreshDeckLock() {
+          const locked = autoRx && mode === "rx";
+          $("ctrlPanel").classList.toggle("locked", locked);
+          $("deckTag").textContent = locked
+            ? "RX AUTO — SET BY SENDER"
+            : "MATCH ON BOTH ENDS";
+        }
+        function setAutoRx(onoff) {
+          autoRx = onoff;
+          $("rxAuto").classList.toggle("pressed", autoRx);
+          $("rxAuto").setAttribute("aria-pressed", String(autoRx));
+          refreshDeckLock();
+          if (!restoring)
+            log(
+              autoRx
+                ? "rx auto-detect ON — scanning all bands, channels and speeds"
+                : "rx auto-detect OFF — using deck settings",
+            );
+          if (listening) restartDemod();
+          saveState();
+        }
+        on("rxAuto", "click", () => setAutoRx(!autoRx));
 
         // ================= TRANSMIT =================
         let filePayload = null,
@@ -3312,6 +3843,25 @@ Hello across the air gap 📡</textarea
             linkExtra(),
           );
           const sig = AirGap.modulate(payload, p, { amplitude: 1.0 });
+          // frame inspector (diagnostics panel)
+          const frame = AirGap.encodeFrame(payload, p.parity);
+          const nblocks = Math.ceil((payload.length + 4) / AirGap.RS_DATA);
+          $("txDump").textContent =
+            "── LAST TX FRAME · " + now() + "\n" +
+            "LINK     " + linkDesc(profileName, channelIdx, speedName, p.parity) + "\n" +
+            "TONES    " + p.dataFreqs[0].toFixed(0) + "–" +
+            p.dataFreqs[15].toFixed(0) + " Hz · MARKERS " + p.fp0.toFixed(0) +
+            " / " + p.fp1.toFixed(0) + " Hz\n" +
+            "PAYLOAD  " + payload.length + " B · CRC-32 " +
+            hex8(AirGap.crc32(payload)) + "\n" +
+            "HEADER   " + hexBytes(frame.header.subarray(0, 4)) + "  + RS  " +
+            hexBytes(frame.header.subarray(4)) + "\n" +
+            "BODY     " + nblocks + " RS block(s) · " + frame.body.length +
+            " B on wire (4 B CRC-32 + " + nblocks * p.parity + " B parity)\n" +
+            "FRAME    " + AirGap.totalSymbolsFor(payload.length, p.parity) +
+            " symbols · " + fmtSecs(sig.length / c.sampleRate) + " · " +
+            sig.length + " samples @ " + c.sampleRate + " Hz\n\n" +
+            hexPreview(payload);
           log("on air · " + fmtSecs(sig.length / c.sampleRate), "a");
           playSignal(sig);
         }
@@ -3425,6 +3975,17 @@ registerProcessor('airgap-capture', AirgapCapture);`;
               rxGot = got;
               rxExpected = expected;
             },
+            onAutoLock: (det) => {
+              log(
+                "auto-lock: " +
+                  AirGap.PROFILES[det.profile].label +
+                  " · CH " +
+                  "ABC"[det.channel] +
+                  " · " +
+                  AirGap.SPEEDS[det.speed].label,
+                "g",
+              );
+            },
             onLiveByte: (i, b) => {
               if (!liveBuf) return;
               liveBuf[i] = b;
@@ -3463,6 +4024,18 @@ registerProcessor('airgap-capture', AirgapCapture);`;
                 $("rxSave").disabled = false;
                 $("rxErr").classList.remove("show"); // a success clears the sticky error
                 setResult("ok");
+                $("rxDump").textContent =
+                  "── LAST RX FRAME · " + now() + " · OK\n" +
+                  "LINK     " + rxLinkDesc() + "\n" +
+                  "HEADER   LEN " + r.payload.length + " B · FEC " +
+                  demod.rxParity + " (from header) · CRC-16 OK\n" +
+                  "FEC      " + r.stats.corrected +
+                  " byte(s) corrected by Reed-Solomon\n" +
+                  "SIGNAL   conf min " + r.stats.minConfDb.toFixed(1) +
+                  " dB · avg " + r.stats.avgConfDb.toFixed(1) + " dB · " +
+                  r.stats.symbols + " data symbols\n" +
+                  "CRC-32   " + hex8(AirGap.crc32(r.payload)) + " VERIFIED\n\n" +
+                  hexPreview(r.payload);
                 log(
                   "✓ payload received · " +
                     r.payload.length +
@@ -3486,12 +4059,31 @@ registerProcessor('airgap-capture', AirgapCapture);`;
                   "LAST ERROR " + now() + " — " + (ERRORS[r.error] || r.error);
                 $("rxErr").classList.add("show");
                 setResult("err");
+                $("rxDump").textContent =
+                  "── LAST RX FRAME · " + now() + " · FAILED\n" +
+                  "LINK     " + rxLinkDesc() + "\n" +
+                  "ERROR    " + (ERRORS[r.error] || r.error) +
+                  (liveBuf && liveN
+                    ? "\nRAW      " + liveN +
+                      " unverified byte(s) streamed before failure\n\n" +
+                      hexPreview(liveBuf.subarray(0, liveN))
+                    : "");
                 log("✗ decode failed: " + (ERRORS[r.error] || r.error), "r");
               }
               liveBuf = null;
               liveN = 0;
             },
           };
+        }
+
+        // link description for the RX frame inspector (auto-detected or manual)
+        function rxLinkDesc() {
+          const parity = demod ? demod.rxParity : fecParity;
+          if (autoRx && demod && demod.detected) {
+            const d = demod.detected;
+            return linkDesc(d.profile, d.channel, d.speed, parity) + " (AUTO)";
+          }
+          return linkDesc(profileName, channelIdx, speedName, parity);
         }
 
         function hexPreview(bytes) {
@@ -3510,13 +4102,15 @@ registerProcessor('airgap-capture', AirgapCapture);`;
 
         function restartDemod() {
           if (!ctx) return;
-          demod = new AirGap.Demodulator(
-            ctx.sampleRate,
-            profileName,
-            demodCallbacks(),
-            speedName,
-            linkExtra(),
-          );
+          demod = autoRx
+            ? new AirGap.AutoDemodulator(ctx.sampleRate, demodCallbacks())
+            : new AirGap.Demodulator(
+                ctx.sampleRate,
+                profileName,
+                demodCallbacks(),
+                speedName,
+                linkExtra(),
+              );
           setLeds("LISTENING");
         }
 
@@ -3900,6 +4494,7 @@ registerProcessor('airgap-capture', AirgapCapture);`;
               setChannel(s.channel);
             if (s.profile === "audible" || s.profile === "ultrasonic")
               setProfile(s.profile);
+            if (typeof s.auto === "boolean") setAutoRx(s.auto);
             if (s.mode === "rx" || s.mode === "tx") setMode(s.mode);
             log("settings restored from previous session");
           } finally {
