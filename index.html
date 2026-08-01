@@ -120,10 +120,10 @@ button.danger { color: var(--red); border-color: #7a2a24; }
 /* ---- control deck: rotary knobs ---- */
 .deck { display:flex; gap:8px 28px; align-items:center; flex-wrap:wrap; justify-content:center; }
 .knobunit { text-align:center; user-select:none; -webkit-user-select:none; }
-.klabel { font-size:9px; letter-spacing:.24em; color:var(--faint); }
+.klabel { font-size:9px; letter-spacing:.24em; color:var(--faint); margin-bottom:2px; }
 .kvalue { font-size:11px; color:var(--amber); letter-spacing:.12em; min-height:16px;
   text-shadow:0 0 8px rgba(255,176,32,.3); }
-.knob { position:relative; width:128px; height:124px; margin:0 auto; touch-action:none; cursor:pointer; outline:none; }
+.knob { position:relative; width:136px; height:132px; margin:0 auto; touch-action:none; cursor:pointer; outline:none; }
 .knob:focus-visible { border-radius:50%; box-shadow:0 0 0 1px var(--amber-dim); }
 .knob .kface { position:absolute; left:50%; top:50%; width:76px; height:76px; transform:translate(-50%,-50%);
   border-radius:50%; background: radial-gradient(circle at 38% 30%, #1b2016, #0a0c08 72%);
@@ -1455,7 +1455,7 @@ function makeKnob(el, opts) {
   const labs = angles.map((a, i) => {
     const b = document.createElement('b');
     b.textContent = opts.detents[i].label;
-    return put(b, a, 60, true);
+    return put(b, a, 62, true);
   });
   const wrap = document.createElement('div');
   wrap.className = 'kptrwrap';
@@ -1530,7 +1530,7 @@ makeKnob($('knobBand'), {
   onChange: (i) => setProfile(i === 0 ? 'audible' : 'ultrasonic'),
 });
 makeKnob($('knobSpeed'), {
-  detents: [{ label: '1×' }, { label: '1.5×' }, { label: '2.25×' }],
+  detents: [{ label: '1' }, { label: '1.5' }, { label: '2.25' }],
   span: 180, index: 0,
   onChange: (i) => setSpeed(['robust', 'fast', 'turbo'][i]),
 });
