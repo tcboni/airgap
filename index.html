@@ -53,7 +53,7 @@
         min-height: 100vh;
         padding: 14px 10px 60px;
       }
-      /* CRT scanlines + vignette, very subtle */
+      /* CRT scanlines (subtle) + corner vignette */
       body::before {
         content: "";
         position: fixed;
@@ -74,9 +74,9 @@
         z-index: 41;
         pointer-events: none;
         background: radial-gradient(
-          120% 100% at 50% 40%,
-          transparent 60%,
-          rgba(0, 0, 0, 0.5) 100%
+          90% 85% at 50% 42%,
+          transparent 57%,
+          rgba(0, 0, 0, 0.7) 100%
         );
       }
       .chassis {
