@@ -30,6 +30,8 @@
         --green-dim: #2e7247;
         --red: #ff5040;
         --warn: #ff7038;
+        --cyan: #56d4e8;
+        --cyan-dim: #2a6b7a;
         --mono:
           ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas,
           "Liberation Mono", monospace;
@@ -320,11 +322,23 @@
         color: var(--red);
         border-color: #7a2a24;
       }
+      button.cool {
+        color: var(--cyan);
+        border-color: var(--cyan-dim);
+        text-shadow: 0 0 10px rgba(86, 212, 232, 0.5);
+      }
+      button.cool:hover {
+        border-color: var(--cyan);
+        box-shadow:
+          0 2px 0 #000,
+          0 0 16px rgba(86, 212, 232, 0.15),
+          inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      }
 
       /* mode rocker */
       .rocker {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 1fr 1fr 1fr;
         gap: 0;
         border: 1px solid var(--seam-hi);
         border-radius: 6px;
@@ -357,6 +371,11 @@
         background: linear-gradient(180deg, #0c2a17, #081d10);
         color: var(--green);
         text-shadow: 0 0 12px rgba(92, 240, 140, 0.6);
+      }
+      .rocker button.sel-lk {
+        background: linear-gradient(180deg, #0a2429, #07181d);
+        color: var(--cyan);
+        text-shadow: 0 0 12px rgba(86, 212, 232, 0.6);
       }
 
       /* ---- control deck: rotary knobs ---- */
@@ -782,6 +801,64 @@
       textarea:focus {
         border-color: var(--amber-dim);
       }
+
+      /* ---- link terminal ---- */
+      .chatlog {
+        background: #0a0d08;
+        border: 1px solid var(--seam);
+        border-radius: 4px;
+        padding: 10px;
+        height: 250px; /* matches the TX/RX work areas */
+        overflow-y: auto;
+        font-size: 13px;
+        box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.7);
+      }
+      .chatlog .cl {
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .chatlog .who {
+        color: var(--faint);
+        letter-spacing: 0.1em;
+      }
+      .chatlog .you .sent {
+        color: var(--amber);
+        text-shadow: 0 0 6px rgba(255, 176, 32, 0.25);
+      }
+      .chatlog .you .pend {
+        color: var(--amber-dim);
+      }
+      .chatlog .them .txt {
+        color: var(--green);
+        text-shadow: 0 0 6px rgba(92, 240, 140, 0.25);
+      }
+      .lnkinput {
+        display: block;
+        width: 100%;
+        margin-top: 10px;
+        background: #0a0d08;
+        color: var(--ink);
+        border: 1px solid var(--seam);
+        border-radius: 4px;
+        font-family: var(--mono);
+        font-size: 14px;
+        padding: 10px;
+        box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.7);
+        outline: none;
+        caret-color: var(--cyan);
+      }
+      .lnkinput:focus {
+        border-color: var(--cyan-dim);
+      }
+      .lnkinput::placeholder {
+        color: var(--faint);
+        font-size: 11px;
+        letter-spacing: 0.08em;
+      }
+      .lk .ro .v {
+        color: var(--cyan);
+        text-shadow: 0 0 8px rgba(86, 212, 232, 0.35);
+      }
       /* progress + meters */
       .track {
         position: relative;
@@ -1158,6 +1235,7 @@
           ▲ TRANSMIT
         </button>
         <button id="tabRx" role="tab" aria-selected="false">▼ RECEIVE</button>
+        <button id="tabLink" role="tab" aria-selected="false">⇄ LINK</button>
       </div>
 
       <div class="cols">
@@ -1364,6 +1442,94 @@ Hello across the air gap 📡</textarea
               <div class="t" id="rxSym">SYM —/—</div>
             </div>
           </section>
+
+          <!-- ================= LINK ================= -->
+          <section class="panel lk hide" id="linkPanel">
+            <span class="screw tl"></span><span class="screw tr"></span
+            ><span class="screw bl"></span><span class="screw br"></span>
+            <div class="plabel">
+              <b>◤ LINK</b> FULL-DUPLEX TERMINAL — BURST + HEARTBEAT · AUTO-PAIR
+              <span class="tag" id="lnkTag">OFFLINE</span>
+            </div>
+
+            <div class="ledrow">
+              <div
+                class="led g"
+                id="ledLnkOn"
+                data-tip="Link open: microphone live, watching the channel, ready to key up the moment you type."
+              >
+                <i></i><span>ON LINE</span>
+              </div>
+              <div
+                class="led a"
+                id="ledLnkTx"
+                data-tip="Your carrier is keyed — blinking while characters go out, solid during the brief keepalive. Silent between bursts once linked; a soft quarter-volume heartbeat every ~8 s (this lamp pulses with it) tells the partner you're still there. While still unpaired it calls continuously so the partner's scan can find it."
+              >
+                <i></i><span>TX</span>
+              </div>
+              <div
+                class="led g"
+                id="ledLnkRx"
+                data-tip="Locked to the partner station's carrier — blinks as their characters arrive."
+              >
+                <i></i><span>RX</span>
+              </div>
+              <div
+                class="led ann"
+                id="annLnk"
+                data-tip="LINK: confirmed both ways — each station has proven it hears the other (invisible ENQ/ACK handshake in the stream). HEARD: one-way only — the partner is audible but hasn't confirmed it hears us yet; still calling at full volume. SOLO: calling, nobody heard. SRCH: scanning."
+              >
+                <b id="annLnkTxt">—</b>
+              </div>
+            </div>
+
+            <button
+              class="big cool"
+              id="lnkOpen"
+              data-tip="Opens the microphone and starts the pairing dance: the first station up takes channel A and calls; the second hears it and answers on channel B. Once linked the room goes quiet — a soft tick every ~8 s keeps both ends sure of each other, and typing keys the carrier up instantly (the first character after a pause costs ~0.7 s of re-lock, the rest stream live, both directions at once). Needs the AUDIBLE band; match SPEED on both ends."
+            >
+              ◉ OPEN LINK
+            </button>
+
+            <div
+              class="chatlog"
+              id="lnkLog"
+              data-tip="Terminal log. Amber = you (dim tail is still queued, it brightens as it goes on air). Green = the other station, printing live as symbols decode. No FEC in link mode — a noisy channel shows up as wrong characters, teletype style."
+            ></div>
+            <input
+              id="lnkInput"
+              class="lnkinput"
+              autocomplete="off"
+              autocapitalize="off"
+              spellcheck="false"
+              placeholder="TYPE HERE — EACH KEY GOES OUT AS SOUND · ↵ ENDS THE LINE"
+              data-tip="Live keyboard: characters transmit as you press them — no send button. Backspace deletes only characters still waiting in the queue; what's on air is on air. Paste works too."
+            />
+
+            <div class="readouts">
+              <div
+                class="ro"
+                data-tip="Characters waiting to go out — grows if you type faster than the air rate."
+              >
+                <div class="k">QUEUE</div>
+                <div class="v" id="lnkQueueVal">0</div>
+              </div>
+              <div
+                class="ro"
+                data-tip="Sustained character rate at the current SPEED setting — one byte is two tone symbols. Mid-burst characters are near-instant; the first one after a quiet pause adds ~0.7 s of carrier re-acquisition."
+              >
+                <div class="k">CHAR RATE</div>
+                <div class="v" id="lnkRateVal">—</div>
+              </div>
+              <div
+                class="ro"
+                data-tip="Automatic channel assignment: TX is where your carrier sits, RX is where the partner's is. First station up takes A, the second answers on B — the CHANNEL knob is not used in link mode."
+              >
+                <div class="k">CHANNEL</div>
+                <div class="v" id="lnkChanVal">—</div>
+              </div>
+            </div>
+          </section>
         </div>
         <aside class="colside">
           <!-- ================= CONTROL DECK ================= -->
@@ -1388,7 +1554,8 @@ Hello across the air gap 📡</textarea
               <div class="deckrow">
                 <div
                   class="knobunit"
-                  data-tip="Carrier band for the 16 data tones. Press to switch — the buttons latch like a real radio. Both devices must be set to the same band (or enable AUTO on the receiver). Ultrasonic is near-silent to most adults but needs decent speakers and mics — many phones roll off above 18 kHz."
+                  id="bandUnit"
+                  data-tip="Carrier band for the 16 data tones. Press to switch — the buttons latch like a real radio. Both devices must be set to the same band (or enable AUTO on the receiver). Ultrasonic is near-silent to most adults but needs decent speakers and mics — many phones roll off above 18 kHz. Link mode always uses AUDIBLE (it needs the channel pair)."
                 >
                   <div class="klabel">BAND</div>
                   <div class="pushsw" role="radiogroup" aria-label="Band">
@@ -1408,7 +1575,8 @@ Hello across the air gap 📡</textarea
                 </div>
                 <div
                   class="knobunit"
-                  data-tip="Channel plan: shifts the whole tone set so two device pairs can transmit in the same room without colliding. A = 1.9 kHz base, B = +3.8 kHz, C = +7.6 kHz. Must match on both ends. The ultrasonic band has no spare spectrum below Nyquist, so it is single-channel there."
+                  id="chUnit"
+                  data-tip="Channel plan: shifts the whole tone set so two device pairs can transmit in the same room without colliding. A = 1.9 kHz base, B = +3.8 kHz, C = +7.6 kHz. Must match on both ends. The ultrasonic band has no spare spectrum below Nyquist, so it is single-channel there. Link mode assigns channels automatically and ignores this knob."
                 >
                   <div class="klabel">CHANNEL</div>
                   <div class="pushsw" role="radiogroup" aria-label="Channel">
@@ -1570,7 +1738,10 @@ NO FRAME RECEIVED YET</pre
         <b>FIELD MANUAL:</b> HOLD DEVICES 30 CM – 1 M APART · RAISE VOLUME ·
         QUIET ROOM HELPS<br />
         MATCH BAND · CHANNEL · SPEED ON BOTH ENDS — OR PRESS AUTO ON THE
-        RECEIVER · ULTRASONIC IS HARDWARE-DEPENDENT · HOVER ANY CONTROL FOR HELP
+        RECEIVER · ULTRASONIC IS HARDWARE-DEPENDENT · HOVER ANY CONTROL FOR
+        HELP<br />
+        LINK MODE: OPEN ON BOTH DEVICES — FIRST TAKES CH A, SECOND ANSWERS ON CH
+        B · FULL DUPLEX · CHARACTERS STREAM AS YOU TYPE
       </div>
       <footer>
         SINGLE FILE · WORKS OFFLINE · ADD ?selftest TO URL FOR FULL DIAGNOSTIC
@@ -2920,6 +3091,260 @@ NO FRAME RECEIVED YET</pre
           }
         }
 
+        // ---- Link mode (half-duplex character stream) ----
+        //
+        // Chat has no frames: after one join cycle the carrier stays up and
+        // characters stream as raw symbol pairs. The wire alphabet:
+        //   data tones (16)   nibble; two per byte, bytes start on symbol
+        //                     pairs and only ever begin right after a byte
+        //                     boundary (TX never idles mid-byte)
+        //   fp0/fp1 single    idle keepalive — byte-aligned, keeps the
+        //                     receiver's symbol clock locked between keys
+        //   fp0+fp1 dual      join marker; ends every idle cycle so a late
+        //                     receiver can lock mid-conversation (ignored
+        //                     once locked)
+        //   silence           >= LINK_MISS_LIMIT symbols of nothing ends the
+        //                     burst (there is no end marker — VOX just lets
+        //                     the carrier drop)
+        // Errors print as wrong characters (teletype rules — no FEC, no
+        // retransmit); the idle resets between keystrokes re-align nibble
+        // pairing, so a slipped symbol garbles at most one burst of typing.
+        const LINK_JOIN_SYMS = PREAMBLE_SYMS + 1; // alternation + dual marker
+        const LINK_MISS_LIMIT = 3;
+
+        // Join/idle cycle, position i: same shape as the frame preamble+sync
+        // so Demodulator's lock logic recognizes it unchanged.
+        function linkJoinFreqs(p, i) {
+          const k = i % LINK_JOIN_SYMS;
+          if (k === LINK_JOIN_SYMS - 1) return [p.fp0, p.fp1];
+          return [k % 2 ? p.fp1 : p.fp0];
+        }
+
+        // One symbol of the live stream. baseSample is the running sample
+        // index from burst start so repeated frequencies stay phase-continuous
+        // across separately synthesized symbols (same rule as modulate()).
+        function linkSymbolSamples(freqs, baseSample, p, amp) {
+          const N = p.symbolLen,
+            R = p.rampLen;
+          const out = new Float32Array(N);
+          const a = (amp != null ? amp : 0.8) / freqs.length;
+          const twoPiOverFs = (2 * Math.PI) / p.fs;
+          for (let n = 0; n < N; n++) {
+            let env = 1;
+            if (n < R) env = 0.5 - 0.5 * Math.cos((Math.PI * n) / R);
+            else if (n >= N - R)
+              env = 0.5 - 0.5 * Math.cos((Math.PI * (N - n)) / R);
+            const t = baseSample + n;
+            let v = 0;
+            for (let f = 0; f < freqs.length; f++)
+              v += Math.sin(twoPiOverFs * freqs[f] * t);
+            out[n] = a * env * v;
+          }
+          return out;
+        }
+
+        // Streaming receiver: reuses Demodulator's wide-band search, preamble
+        // lock, phase refine and early-late clock tracking; only the
+        // post-sync state differs (STREAM instead of HEADER/PAYLOAD).
+        // Callbacks: onChar(text), onBurstEnd(reason), onState(state).
+        class LinkDemodulator extends Demodulator {
+          constructor(fs, profileName, cb, speedName, extra) {
+            super(fs, profileName, cb, speedName, extra);
+            this.utf8 = null;
+            this.pendingHi = -1;
+          }
+
+          _step() {
+            if (this.state === "LISTENING") return this._stepListen();
+            if (this.state === "STREAM") return this._stepStream();
+            return this._stepJoin(); // PREAMBLE
+          }
+
+          // PREAMBLE tracking — same logic as the frame demodulator's
+          // preamble branch, but the sync/join marker starts a stream.
+          _stepJoin() {
+            const P = this.p,
+              half = P.fftSize >> 1;
+            if (this.refine) {
+              if (this.symCenter + half + (P.symbolLen >> 1) + 1 > this.total)
+                return false;
+              this._refinePhase();
+              this.refine = false;
+            }
+            if (this.symCenter + half + P.elDelta + 1 > this.total)
+              return false;
+            if (this.symCenter - half - P.elDelta < this.total - this.cap) {
+              this._toListening();
+              return true;
+            }
+            const pow = this._spectrumAt(this.symCenter);
+            const floor = this._floor(pow);
+            const p0 = this._tonePow(pow, P.binP0);
+            const p1 = this._tonePow(pow, P.binP1);
+            const mx = Math.max(p0, p1),
+              mn = Math.min(p0, p1);
+            if (mn > DUAL_MIN * mx && mn > 8 * floor) {
+              if (this._prevSymbolSingle()) {
+                this.pendingHi = -1;
+                this.missTicks = 0;
+                this.utf8 =
+                  typeof TextDecoder !== "undefined"
+                    ? new TextDecoder("utf-8")
+                    : null;
+                this._setState("STREAM");
+                this.symCenter += P.symbolLen;
+                return true;
+              }
+              if (this.straddleRefines < 2) {
+                this.straddleRefines++;
+                this.refine = true;
+                return true;
+              }
+            }
+            if (mx > TONE_THR * floor) {
+              this.preTicks++;
+              if (this.preTicks > 24) {
+                this._toListening();
+                return true;
+              }
+              this.symCenter +=
+                P.symbolLen + this._clockAdjust(p0 > p1 ? P.fp0 : P.fp1);
+              return true;
+            }
+            if (++this.missTicks > 2) {
+              this._toListening();
+              return true;
+            }
+            this.symCenter += P.symbolLen;
+            return true;
+          }
+
+          _stepStream() {
+            const P = this.p,
+              half = P.fftSize >> 1;
+            if (this.symCenter + half + P.elDelta + 1 > this.total)
+              return false;
+            if (this.symCenter - half - P.elDelta < this.total - this.cap) {
+              this._endBurst("LOST");
+              return true;
+            }
+            const pow = this._spectrumAt(this.symCenter);
+            const floor = this._floor(pow);
+            const p0 = this._tonePow(pow, P.binP0);
+            const p1 = this._tonePow(pow, P.binP1);
+            const mx = Math.max(p0, p1),
+              mn = Math.min(p0, p1);
+            const picked = this._pickTone(pow);
+            const dataPow = this._tonePow(pow, P.dataBins[picked.nib]);
+            let adjFreq = 0;
+            if (mn > DUAL_MIN * mx && mn > 8 * floor) {
+              // join marker inside an idle cycle — byte boundary, no data
+              this.pendingHi = -1;
+              this.missTicks = 0;
+            } else if (mx > TONE_THR * floor && mx > 2 * dataPow) {
+              // idle keepalive — byte boundary; track the clock on it
+              this.pendingHi = -1;
+              this.missTicks = 0;
+              adjFreq = p0 > p1 ? P.fp0 : P.fp1;
+            } else if (dataPow > TONE_THR * floor) {
+              this.missTicks = 0;
+              this.lastConfDb = picked.conf;
+              if (this.pendingHi < 0) this.pendingHi = picked.nib;
+              else {
+                const byte = (this.pendingHi << 4) | picked.nib;
+                this.pendingHi = -1;
+                const txt = this.utf8
+                  ? this.utf8.decode(new Uint8Array([byte]), { stream: true })
+                  : String.fromCharCode(byte);
+                if (txt && this.cb.onChar) this.cb.onChar(txt);
+              }
+              adjFreq = P.dataFreqs[picked.nib];
+            } else {
+              // nothing on the air — the sender's VOX released
+              if (++this.missTicks >= LINK_MISS_LIMIT) {
+                this._endBurst("END");
+                return true;
+              }
+              this.symCenter += P.symbolLen;
+              return true;
+            }
+            this.symCenter +=
+              P.symbolLen + (adjFreq ? this._clockAdjust(adjFreq) : 0);
+            return true;
+          }
+
+          _endBurst(reason) {
+            if (this.utf8) {
+              // flush a dangling multi-byte UTF-8 sequence
+              const tail = this.utf8.decode();
+              if (tail && this.cb.onChar) this.cb.onChar(tail);
+              this.utf8 = null;
+            }
+            if (this.cb.onBurstEnd) this.cb.onBurstEnd(reason);
+            this._toListening();
+          }
+        }
+
+        // In-memory link-stream round trip for the self-tests: one join
+        // cycle, the text's bytes with idle cycles sprinkled between them
+        // (as live typing pauses would), then silence so the burst closes.
+        function linkLoopback(text, fs, opts) {
+          opts = opts || {};
+          const p = makeParams(fs, opts.profile || "audible", opts.speed, {
+            channel: opts.channel,
+          });
+          const bytes = textBytes(text);
+          const syms = [];
+          for (let i = 0; i < LINK_JOIN_SYMS; i++)
+            syms.push(linkJoinFreqs(p, i));
+          for (let i = 0; i < bytes.length; i++) {
+            syms.push([p.dataFreqs[bytes[i] >> 4]]);
+            syms.push([p.dataFreqs[bytes[i] & 0x0f]]);
+            // a typing pause every few bytes, one of them a full join cycle
+            if (i % 5 === 2) {
+              if (i % 10 === 2)
+                for (let k = 0; k < LINK_JOIN_SYMS; k++)
+                  syms.push(linkJoinFreqs(p, k));
+              else {
+                syms.push([p.fp0]);
+                syms.push([p.fp1]);
+              }
+            }
+          }
+          syms.push([p.fp0]);
+          syms.push([p.fp1]);
+          const N = p.symbolLen;
+          const lead = Math.round(0.25 * fs),
+            tail = Math.round(0.5 * fs);
+          let sig = new Float32Array(lead + syms.length * N + tail);
+          for (let s = 0; s < syms.length; s++)
+            sig.set(linkSymbolSamples(syms[s], s * N, p, 0.8), lead + s * N);
+          if (opts.drift && opts.drift !== 1)
+            sig = resampleLinear(sig, opts.drift);
+          if (opts.snrDb != null) {
+            const rand = mulberry32(opts.seed || 0xa1b2c3);
+            const noiseRms = rmsOf(sig) / Math.pow(10, opts.snrDb / 20);
+            for (let i = 0; i < sig.length; i++)
+              sig[i] += gaussian(rand) * noiseRms;
+          }
+          let out = "",
+            bursts = 0;
+          const d = new LinkDemodulator(
+            fs,
+            opts.profile || "audible",
+            {
+              onChar: (t) => (out += t),
+              onBurstEnd: () => bursts++,
+            },
+            opts.speed,
+            { channel: opts.channel },
+          );
+          for (let off = 0; off < sig.length; off += 2048)
+            d.push(sig.subarray(off, Math.min(off + 2048, sig.length)));
+          d.push(new Float32Array(Math.round(fs * 0.3)));
+          return { text: out, bursts, seconds: sig.length / fs };
+        }
+
         // ---- Loopback & self-tests ----
 
         function mulberry32(seed) {
@@ -3471,6 +3896,48 @@ NO FRAME RECEIVED YET</pre
             },
           );
 
+          const linkTest = (name, hard, fs, opts, text) => {
+            test(name, hard, () => {
+              const want = text != null ? text : "cq cq LINK de MK-1 ↵ 073";
+              const r = linkLoopback(want, fs, opts);
+              const pass = r.text === want && r.bursts >= 1;
+              return {
+                pass,
+                detail: pass
+                  ? r.seconds.toFixed(1) +
+                    "s audio · burst closed after " +
+                    r.bursts +
+                    " release(s)"
+                  : "got " +
+                    JSON.stringify(r.text) +
+                    " (bursts " +
+                    r.bursts +
+                    ")",
+              };
+            });
+          };
+          linkTest("LINK stream clean @ 48000 Hz", true, 48000, {});
+          linkTest("LINK stream clean @ 44100 Hz", true, 44100, {});
+          linkTest("LINK stream FAST + white noise, SNR 10 dB", true, 48000, {
+            speed: "fast",
+            snrDb: 10,
+          });
+          linkTest("LINK stream TURBO + clock drift +0.2%", true, 48000, {
+            speed: "turbo",
+            drift: 1.002,
+          });
+          linkTest("LINK stream ultrasonic FAST @ 48000 Hz", true, 48000, {
+            profile: "ultrasonic",
+            speed: "fast",
+          });
+          linkTest(
+            "LINK stream UTF-8 multibyte, idle mid-sequence",
+            true,
+            48000,
+            {},
+            "ÅIR ⇄ GAP ✓ émoji 📡",
+          );
+
           return T;
         }
 
@@ -3497,6 +3964,11 @@ NO FRAME RECEIVED YET</pre
           modulate,
           Demodulator,
           AutoDemodulator,
+          LINK_JOIN_SYMS,
+          linkJoinFreqs,
+          linkSymbolSamples,
+          LinkDemodulator,
+          linkLoopback,
           loopback,
           autoLoopback,
           resampleLinear,
@@ -3880,6 +4352,7 @@ NO FRAME RECEIVED YET</pre
             log("channel " + "ABC"[i] + " (" + CH_LABELS[i] + ")");
           updateFsInfo();
           if (listening) restartDemod();
+          if (lnkOn) lnkApplySettings();
           saveState();
         }
         on("chA", "click", () => setChannel(0));
@@ -3907,6 +4380,7 @@ NO FRAME RECEIVED YET</pre
             );
           refreshTxInfo();
           if (listening) restartDemod();
+          if (lnkOn) lnkApplySettings();
           saveState();
         }
 
@@ -3922,6 +4396,7 @@ NO FRAME RECEIVED YET</pre
           if (!restoring) log("band set to " + AirGap.PROFILES[name].label);
           updateFsInfo();
           if (listening) restartDemod();
+          if (lnkOn) lnkApplySettings();
           saveState();
         }
         on("bandAud", "click", () => setProfile("audible"));
@@ -3944,6 +4419,7 @@ NO FRAME RECEIVED YET</pre
           updateFsInfo();
           refreshTxInfo();
           if (listening) restartDemod();
+          if (lnkOn) lnkApplySettings();
           saveState();
         }
         const SPEED_ORDER = ["normal", "fast", "turbo", "max"];
@@ -3989,16 +4465,27 @@ NO FRAME RECEIVED YET</pre
           mode = m;
           $("tabTx").className = m === "tx" ? "sel-tx" : "";
           $("tabRx").className = m === "rx" ? "sel-rx" : "";
+          $("tabLink").className = m === "link" ? "sel-lk" : "";
           $("tabTx").setAttribute("aria-selected", m === "tx");
           $("tabRx").setAttribute("aria-selected", m === "rx");
+          $("tabLink").setAttribute("aria-selected", m === "link");
           $("txPanel").classList.toggle("hide", m !== "tx");
           $("rxPanel").classList.toggle("hide", m !== "rx");
-          if (!txPlaying && !listening) clearScope();
+          $("linkPanel").classList.toggle("hide", m !== "link");
+          if (m !== "link" && lnkOn) lnkCloseLink();
+          // link is audible-only (needs the CH A + CH B pair); switch the
+          // band here so the disabled BAND buttons can't trap ultrasonic
+          if (m === "link" && profileName === "ultrasonic") {
+            if (!restoring) log("link mode uses the AUDIBLE band");
+            setProfile("audible");
+          }
+          if (!txPlaying && !listening && !lnkOn) clearScope();
           refreshDeckLock();
           saveState();
         }
         on("tabTx", "click", () => setMode("tx"));
         on("tabRx", "click", () => setMode("rx"));
+        on("tabLink", "click", () => setMode("link"));
 
         // ---- receiver auto-detect toggle ----
         function refreshDeckLock() {
@@ -4011,6 +4498,10 @@ NO FRAME RECEIVED YET</pre
           $("autoRow").classList.toggle("hide", mode !== "rx");
           // output volume is meaningless while receiving
           $("volUnit").classList.toggle("disabled", mode === "rx");
+          // link mode is audible-only, auto-assigns channels and has no FEC
+          $("bandUnit").classList.toggle("disabled", mode === "link");
+          $("chUnit").classList.toggle("disabled", mode === "link");
+          $("fecUnit").classList.toggle("disabled", mode === "link");
         }
         function setAutoRx(onoff) {
           autoRx = onoff;
@@ -4706,6 +5197,747 @@ registerProcessor('airgap-capture', AirgapCapture);`;
           log("mic error: " + msg, "r");
         }
 
+        // ================= LINK (full-duplex live terminal) =================
+        // Continuous-carrier link over a channel pair. Pairing: a station
+        // that opens the link first listens on CH A; hearing nothing, it
+        // takes CH A and starts a standing carrier (idle keepalive cycles).
+        // The second station's scan hears that carrier and answers on CH B.
+        // From then on BOTH carriers stay up — the tone sets are disjoint,
+        // so the stations transmit and receive simultaneously and a typed
+        // character is just two data symbols dropped into an already-locked
+        // stream: no per-message acquisition, sub-second latency.
+        //
+        // TX is a per-symbol scheduler: each symbol is synthesized into its
+        // own AudioBuffer (phase-locked to the burst's running sample
+        // counter) and scheduled sample-accurately, so the stream extends
+        // live as keys arrive. Collision breaker: a station calling alone
+        // on CH A goes briefly quiet every few seconds to check whether
+        // another station is also stuck calling on CH A (possible when both
+        // open simultaneously); if so it flips to CH B and the link forms.
+        const LNK_QUEUE_MAX = 512; // typed characters allowed to pile up
+        const LNK_AHEAD_SEC = 0.35; // how far ahead symbols are scheduled
+        const LNK_SCAN_SEC = 1.5; // min initial listen-before-calling
+        const LNK_RESCAN_SEC = 1.4; // quiet window of the collision breaker
+        const LNK_VOX_SEC = 1.0; // linked: empty-queue time before carrier drop
+        // The heartbeat is liveness, not clock sync (every burst re-syncs
+        // itself): it's how a station knows its partner is still there —
+        // without it, "idle" and "gone" are indistinguishable and the only
+        // safe reaction to "gone" is the loud continuous calling beacon.
+        // Rare + quiet + patient keeps that machinery while staying barely
+        // audible, and the wide presence window means a couple of missed
+        // ticks never flap the link back into calling.
+        const LNK_BEAT_SEC = 8; // linked: idle heartbeat period
+        const LNK_BEAT_AMP = 0.25; // heartbeat amplitude (~-12 dB vs data)
+        const LNK_PRESENCE_SEC = 30; // partner considered gone after this silence
+        // Hearing the partner only proves ONE direction of the link. LINKED
+        // requires confirmation both ways, done with two invisible control
+        // bytes in the character stream: a station that hears its partner
+        // but isn't confirmed sends ENQ ("I hear you — do you hear me?")
+        // about once a second, still at full calling volume; receiving ENQ
+        // or its ACK reply proves the partner hears US (they only send
+        // those while hearing). Only then does the station trust the link
+        // and drop into quiet heartbeat mode. ACK never answers an ACK, so
+        // the exchange terminates.
+        const LNK_ENQ = "\u0005"; // "I hear you — do you hear me?"
+        const LNK_ACK = "\u0006"; // "I hear you too"
+        const LNK_ENQ_SEC = 1.2; // ENQ repeat while unconfirmed
+        const LNK_HEARD_SEC = 2.5; // "currently hearing partner" window
+
+        let lnkOn = false,
+          lnkRole = null, // "scan" | "rescan" | "A" | "B"
+          lnkLinked = false,
+          lnkConfirmed = false, // partner has proven it hears us (ENQ/ACK)
+          lnkCarrier = false,
+          lnkTxCh = 0,
+          lnkRxCh = 0;
+        let lnkCtrl = [], // control characters waiting to go out (invisible)
+          lnkNextEnq = 0,
+          lnkAckMuteUntil = 0;
+        let lnkDemod = null,
+          lnkMic = null,
+          lnkMicNode = null,
+          lnkTap = null,
+          lnkSink = null,
+          lnkGain = null;
+        let lnkP = null, // TX params (channel = lnkTxCh)
+          lnkQueue = [],
+          lnkFifo = [], // symbols of the byte currently going out
+          lnkBase = 0, // sample counter from carrier start (phase lock)
+          lnkT0 = 0, // AudioContext time of carrier start
+          lnkJoinPos = 0,
+          lnkFirstJoinDone = false,
+          lnkIdlePos = 0,
+          lnkIdleSyms = 0,
+          lnkBeatOnly = false, // current burst is just a heartbeat
+          lnkTailUntil = 0; // when the released carrier's tail leaves the air
+        let lnkScanDeadline = 0,
+          lnkRescanUntil = 0,
+          lnkNextRescan = 0,
+          lnkNextBeat = 0,
+          lnkLastHeard = -1e9, // partner presence (any lock or character)
+          lnkLastRecv = 0,
+          lnkTimer = 0,
+          lnkRaf = 0;
+        let lnkYou = null,
+          lnkThem = null; // open chat-log lines (DOM nodes)
+
+        // full duplex: the mic always feeds the demodulator — our own
+        // carrier sits on the other channel, outside the demod's band
+        function lnkPush(chunk) {
+          if (lnkOn && lnkDemod) lnkDemod.push(chunk);
+        }
+
+        function lnkRestartDemod() {
+          if (!ctx) return;
+          lnkDemod = new AirGap.LinkDemodulator(
+            ctx.sampleRate,
+            profileName,
+            {
+              onState: (s) => {
+                // any lock — a heartbeat, a burst preamble, a stream —
+                // proves the partner is alive
+                if (s !== "LISTENING" && ctx) lnkLastHeard = ctx.currentTime;
+              },
+              onChar: (t) => lnkOnCharRecv(t),
+              onBurstEnd: () => {
+                lnkThem = null;
+              },
+            },
+            speedName,
+            { channel: lnkRxCh },
+          );
+        }
+
+        function lnkApplySettings() {
+          if (!lnkOn) return;
+          if (profileName === "ultrasonic") {
+            log(
+              "link: ultrasonic is single-channel — LINK needs the AUDIBLE band's channel pair; closing",
+              "r",
+            );
+            lnkCloseLink();
+            return;
+          }
+          // speed changed: both carrier and demod need the new symbol
+          // clock, and the partner must re-prove it still hears us
+          lnkConfirmed = false;
+          lnkCtrl = [];
+          const hadCarrier = lnkCarrier;
+          if (hadCarrier) lnkStopCarrier();
+          lnkRestartDemod();
+          if (hadCarrier) lnkStartCarrier(false);
+          $("lnkRateVal").textContent =
+            (1 / (2 * AirGap.SPEEDS[speedName].symbolSec)).toFixed(1) + " ch/s";
+        }
+
+        // ---- pairing / roles ----
+
+        function lnkAdoptRole(txCh, rxCh) {
+          lnkTxCh = txCh;
+          lnkRxCh = rxCh;
+          lnkRole = txCh === 0 ? "A" : "B";
+          // a scan that just heard the partner keeps its demod (and lock);
+          // only retune if the listen channel actually changes
+          if (!lnkDemod || lnkDemod.p.channel !== rxCh) lnkRestartDemod();
+          lnkStartCarrier(false);
+          lnkNextRescan = ctx.currentTime + 6 + Math.random() * 4;
+          log(
+            "link: calling on CH " +
+              "AB"[txCh] +
+              " · listening on CH " +
+              "AB"[rxCh],
+            "g",
+          );
+        }
+
+        // ---- TX: burst + heartbeat carrier + symbol scheduler ----
+
+        // beat=true keys a heartbeat: just the join cycle, then release.
+        // Typing during any burst converts it into a data burst seamlessly.
+        function lnkStartCarrier(beat) {
+          lnkP = AirGap.makeParams(ctx.sampleRate, profileName, speedName, {
+            channel: lnkTxCh,
+          });
+          lnkCarrier = true;
+          lnkBeatOnly = !!beat;
+          lnkBase = 0;
+          lnkJoinPos = 0;
+          lnkFirstJoinDone = false;
+          lnkIdlePos = 0;
+          lnkIdleSyms = 0;
+          lnkFifo = [];
+          lnkT0 = Math.max(ctx.currentTime, lnkTailUntil) + 0.08;
+          lnkSchedule();
+        }
+
+        function lnkStopCarrier() {
+          lnkCarrier = false;
+          lnkTailUntil = 0;
+          if (lnkGain) {
+            // orphan every scheduled source in one move
+            try {
+              lnkGain.disconnect();
+            } catch (e) {}
+            lnkGain = ctx.createGain();
+            lnkGain.gain.value = txVolume;
+            lnkGain.connect(ctx.destination);
+          }
+        }
+
+        // Next symbol to put on air, or null to release the carrier. Every
+        // burst opens with one join cycle (alternation + dual marker, same
+        // shape as a frame preamble so the stock lock logic acquires it),
+        // then: data while queued; idle keepalive while linked for a short
+        // VOX window; forever while unpaired (the calling beacon that lets
+        // a scanning partner find us). Heartbeats release right after the
+        // join cycle.
+        function lnkNextSymbol() {
+          const P = lnkP;
+          if (!lnkFirstJoinDone) {
+            const s = AirGap.linkJoinFreqs(P, lnkJoinPos++);
+            if (lnkJoinPos >= AirGap.LINK_JOIN_SYMS) {
+              lnkFirstJoinDone = true;
+              lnkIdlePos = 0;
+            }
+            return s;
+          }
+          if (lnkFifo.length) return lnkFifo.shift();
+          if (lnkCtrl.length) {
+            // handshake bytes ride the data stream but never hit the log
+            const ch = lnkCtrl.shift();
+            for (const b of new TextEncoder().encode(ch)) {
+              lnkFifo.push([P.dataFreqs[b >> 4]]);
+              lnkFifo.push([P.dataFreqs[b & 0x0f]]);
+            }
+            lnkBeatOnly = false;
+            lnkIdleSyms = 0;
+            lnkIdlePos = 0;
+            return lnkFifo.shift();
+          }
+          if (lnkQueue.length) {
+            const ch = lnkQueue.shift();
+            const bytes = new TextEncoder().encode(ch);
+            for (const b of bytes) {
+              lnkFifo.push([P.dataFreqs[b >> 4]]);
+              lnkFifo.push([P.dataFreqs[b & 0x0f]]);
+            }
+            lnkBeatOnly = false;
+            lnkIdleSyms = 0;
+            lnkIdlePos = 0; // idle restarts on alternation after data
+            lnkOnCharSent(ch);
+            return lnkFifo.shift();
+          }
+          if (lnkBeatOnly) return null; // heartbeat done
+          if (lnkLinked && ++lnkIdleSyms > Math.ceil(LNK_VOX_SEC / P.symbolSec))
+            return null; // linked VOX release — go quiet until typed at
+          return AirGap.linkJoinFreqs(P, lnkIdlePos++ % AirGap.LINK_JOIN_SYMS);
+        }
+
+        function lnkSchedule() {
+          if (!lnkOn || !lnkCarrier) return;
+          const c = ctx;
+          if (
+            lnkBase > 0 &&
+            lnkT0 + lnkBase / c.sampleRate < c.currentTime - 0.02
+          ) {
+            // scheduler starved (tab throttled): the carrier already broke
+            // on air — restart it with a fresh join cycle so the partner
+            // re-locks
+            log("link: audio underrun — carrier restarted", "r");
+            lnkStopCarrier();
+            lnkStartCarrier(false);
+            return;
+          }
+          const horizon = c.currentTime + LNK_AHEAD_SEC;
+          while (lnkT0 + lnkBase / c.sampleRate < horizon) {
+            const freqs = lnkNextSymbol();
+            if (!freqs) {
+              // release: let the scheduled tail play out; remember when it
+              // ends so a quick keypress can splice back into the timeline
+              lnkCarrier = false;
+              lnkTailUntil = lnkT0 + lnkBase / c.sampleRate;
+              lnkNextBeat = lnkTailUntil + LNK_BEAT_SEC;
+              break;
+            }
+            const buf = c.createBuffer(1, lnkP.symbolLen, c.sampleRate);
+            buf
+              .getChannelData(0)
+              .set(
+                AirGap.linkSymbolSamples(
+                  freqs,
+                  lnkBase,
+                  lnkP,
+                  lnkBeatOnly ? LNK_BEAT_AMP : 1.0,
+                ),
+              );
+            const src = c.createBufferSource();
+            src.buffer = buf;
+            src.connect(lnkGain);
+            src.start(lnkT0 + lnkBase / c.sampleRate);
+            lnkBase += lnkP.symbolLen;
+          }
+        }
+
+        // ---- chat log ----
+
+        function lnkTrimLog() {
+          const el = $("lnkLog");
+          while (el.childElementCount > 200) el.removeChild(el.firstChild);
+          el.scrollTop = el.scrollHeight;
+        }
+
+        function lnkEnsureYou() {
+          if (lnkYou) return;
+          const d = document.createElement("div");
+          d.className = "cl you";
+          const who = document.createElement("span");
+          who.className = "who";
+          who.textContent = "YOU ▸ ";
+          const sent = document.createElement("span");
+          sent.className = "sent";
+          const pend = document.createElement("span");
+          pend.className = "pend";
+          d.append(who, sent, pend);
+          d._sent = sent;
+          d._pend = pend;
+          $("lnkLog").appendChild(d);
+          lnkYou = d;
+          lnkTrimLog();
+        }
+
+        // the dim tail of the YOU line mirrors the unsent queue
+        function lnkRenderPend() {
+          if (lnkYou && !lnkQueue.length) lnkYou._pend.textContent = "";
+          if (lnkQueue.length) {
+            lnkEnsureYou();
+            lnkYou._pend.textContent = lnkQueue.join("").replace(/\n/g, "↵");
+            lnkTrimLog();
+          }
+          $("lnkQueueVal").textContent = String(lnkQueue.length);
+        }
+
+        function lnkOnCharSent(ch) {
+          if (ch === "\n") {
+            if (lnkYou) lnkYou._pend.textContent = "";
+            lnkYou = null;
+          } else {
+            lnkEnsureYou();
+            lnkYou._sent.textContent += ch;
+          }
+          lnkRenderPend();
+          lnkTrimLog();
+        }
+
+        function lnkOnCharRecv(txt) {
+          if (ctx) lnkLastRecv = lnkLastHeard = ctx.currentTime;
+          for (const ch of txt) {
+            if (ch === LNK_ENQ || ch === LNK_ACK) {
+              // the partner only sends these while hearing us — receiving
+              // one proves the reverse path works: link confirmed
+              lnkConfirmed = true;
+              if (ch === LNK_ENQ && ctx.currentTime > lnkAckMuteUntil) {
+                lnkAckMuteUntil = ctx.currentTime + 1;
+                lnkCtrlSend(LNK_ACK); // never sent in reply to an ACK
+              }
+              continue;
+            }
+            if (ch === "\n") {
+              lnkThem = null;
+              continue;
+            }
+            const cc = ch.codePointAt(0);
+            const vis = cc < 32 || cc === 127 ? "·" : ch;
+            if (!lnkThem) {
+              // their reply starts a new line — close ours, so whatever we
+              // type next lands BELOW their message instead of appending to
+              // the line we were on before they answered
+              if (lnkYou) {
+                lnkYou._pend.textContent = "";
+                lnkYou = null;
+              }
+              const d = document.createElement("div");
+              d.className = "cl them";
+              const who = document.createElement("span");
+              who.className = "who";
+              who.textContent = "THEM ◂ ";
+              const t = document.createElement("span");
+              t.className = "txt";
+              d.append(who, t);
+              d._txt = t;
+              $("lnkLog").appendChild(d);
+              lnkThem = d;
+            }
+            lnkThem._txt.textContent += vis;
+          }
+          // pending (unsent) characters re-materialize on a fresh line below
+          lnkRenderPend();
+          lnkTrimLog();
+        }
+
+        // ---- handshake control bytes ----
+
+        function lnkCtrlSend(ch) {
+          lnkCtrl.push(ch);
+          if (
+            !lnkCarrier &&
+            (lnkRole === "A" || lnkRole === "B") &&
+            lnkTailUntil - ctx.currentTime > 0.06
+          ) {
+            // splice into a still-playing carrier tail, same as typed chars
+            lnkCarrier = true;
+            lnkBeatOnly = false;
+            lnkIdleSyms = 0;
+          }
+          lnkSchedule();
+        }
+
+        // ---- live keyboard ----
+
+        function lnkEnqueue(ch) {
+          if (lnkQueue.length >= LNK_QUEUE_MAX) return;
+          lnkQueue.push(ch);
+          lnkRenderPend();
+          if (
+            !lnkCarrier &&
+            (lnkRole === "A" || lnkRole === "B") &&
+            lnkTailUntil - ctx.currentTime > 0.06
+          ) {
+            // the released carrier's tail is still on air — splice back
+            // into the same timeline so the partner never loses lock
+            lnkCarrier = true;
+            lnkBeatOnly = false;
+            lnkIdleSyms = 0;
+          }
+          lnkSchedule(); // get it on air this tick, not the next one
+        }
+        on("lnkInput", "keydown", (e) => {
+          if (!lnkOn) return;
+          if (e.key === "Backspace") {
+            if (lnkQueue.length) lnkQueue.pop();
+            lnkRenderPend();
+            e.preventDefault();
+            return;
+          }
+          if (e.key === "Enter") {
+            lnkEnqueue("\n");
+            e.preventDefault();
+            return;
+          }
+          if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            lnkEnqueue(e.key);
+            e.preventDefault();
+          }
+        });
+        on("lnkInput", "paste", (e) => {
+          if (!lnkOn) return;
+          e.preventDefault();
+          const txt = (e.clipboardData || window.clipboardData).getData("text");
+          if (txt) for (const ch of txt.replace(/\r/g, "")) lnkEnqueue(ch);
+        });
+
+        // ---- panel state ----
+
+        function lnkLeds() {
+          $("ledLnkOn").classList.toggle("on", lnkOn);
+          $("ledLnkTx").classList.toggle("on", lnkOn && lnkCarrier);
+          const sending =
+            lnkOn && lnkCarrier && (lnkFifo.length > 0 || lnkQueue.length > 0);
+          $("ledLnkTx").classList.toggle("blink", sending);
+          $("ledLnkRx").classList.toggle("on", lnkLinked);
+          const recv = lnkLinked && ctx && ctx.currentTime - lnkLastRecv < 0.6;
+          $("ledLnkRx").classList.toggle("blink", !!recv);
+          const heard =
+            lnkOn && ctx && ctx.currentTime - lnkLastHeard < LNK_HEARD_SEC;
+          $("annLnk").classList.toggle("ok", lnkLinked);
+          $("annLnk").classList.remove("err");
+          $("annLnkTxt").textContent = !lnkOn
+            ? "—"
+            : lnkLinked
+              ? "LINK"
+              : lnkRole === "A" || lnkRole === "B"
+                ? heard
+                  ? "HEARD" // one-way only: partner audible, not confirmed
+                  : "SOLO"
+                : "SRCH";
+          $("lnkChanVal").textContent = !lnkOn
+            ? "—"
+            : lnkRole === "A" || lnkRole === "B"
+              ? "TX " + "AB"[lnkTxCh] + " · RX " + "AB"[lnkRxCh]
+              : "SCAN…";
+          $("lnkTag").textContent = !lnkOn
+            ? "OFFLINE"
+            : lnkLinked
+              ? "LINKED"
+              : lnkRole === "A" || lnkRole === "B"
+                ? heard
+                  ? "CONFIRMING"
+                  : "CALLING"
+                : "SEARCHING";
+        }
+
+        function lnkTick() {
+          if (!lnkOn) return;
+          if (lnkGain) lnkGain.gain.value = txVolume;
+          const t = ctx.currentTime;
+          const hearing = lnkDemod && lnkDemod.state !== "LISTENING";
+          if (lnkRole === "scan") {
+            // first station heard wins CH A; hearing one makes us CH B
+            if (hearing) lnkAdoptRole(1, 0);
+            else if (t > lnkScanDeadline) lnkAdoptRole(0, 1);
+          } else if (lnkRole === "rescan") {
+            if (hearing) {
+              log(
+                "link: partner found calling on CH A — answering on CH B",
+                "g",
+              );
+              lnkAdoptRole(1, 0);
+            } else if (t > lnkRescanUntil) {
+              // nobody there — resume calling on CH A
+              lnkRxCh = 1;
+              lnkRole = "A";
+              lnkRestartDemod();
+              lnkStartCarrier(false);
+              lnkNextRescan = t + 6 + Math.random() * 4;
+            }
+          } else if (lnkRole === "A" && !lnkLinked && t > lnkNextRescan) {
+            // collision breaker: both stations may be calling on CH A,
+            // each deaf to the other — go quiet briefly and listen there
+            lnkStopCarrier();
+            lnkRxCh = 0;
+            lnkRestartDemod();
+            lnkRole = "rescan";
+            lnkRescanUntil = t + LNK_RESCAN_SEC;
+          }
+          // handshake: hearing the partner without confirmation yet — ask
+          // "do you hear me?" about once a second, at full calling volume
+          if (
+            (lnkRole === "A" || lnkRole === "B") &&
+            !lnkConfirmed &&
+            t - lnkLastHeard < LNK_HEARD_SEC &&
+            t > lnkNextEnq
+          ) {
+            lnkNextEnq = t + LNK_ENQ_SEC;
+            lnkCtrlSend(LNK_ENQ);
+          }
+          // carrier policy: unconfirmed stations call continuously (the
+          // beacon a scanning partner finds, now carrying ENQs); a confirmed
+          // link stays quiet, keying up for characters, handshake replies
+          // or the periodic heartbeat
+          if (
+            (lnkRole === "A" || lnkRole === "B") &&
+            !lnkCarrier &&
+            t > lnkTailUntil
+          ) {
+            if (!lnkLinked) lnkStartCarrier(false);
+            else if (lnkQueue.length || lnkCtrl.length) lnkStartCarrier(false);
+            else if (t > lnkNextBeat) lnkStartCarrier(true);
+          }
+          lnkSchedule();
+          const linked =
+            (lnkRole === "A" || lnkRole === "B") &&
+            lnkConfirmed &&
+            t - lnkLastHeard < LNK_PRESENCE_SEC;
+          if (linked !== lnkLinked) {
+            lnkLinked = linked;
+            if (!linked) lnkConfirmed = false; // require a fresh handshake
+            log(
+              linked
+                ? "link: confirmed both ways — quiet between bursts, heartbeat every " +
+                    LNK_BEAT_SEC +
+                    " s"
+                : "link: partner lost — no heartbeat for " +
+                    LNK_PRESENCE_SEC +
+                    " s, calling again",
+              linked ? "g" : "r",
+            );
+            if (!linked && lnkRole === "A")
+              lnkNextRescan = t + 6 + Math.random() * 4;
+          }
+          lnkLeds();
+        }
+
+        function lnkAnim() {
+          if (!lnkOn) return;
+          drawScope(lnkDemod && lnkDemod.p, lnkDemod && lnkDemod.pow);
+          setMeters(
+            lnkDemod && lnkDemod.lastRms > 0
+              ? 20 * Math.log10(lnkDemod.lastRms)
+              : -100,
+            lnkDemod ? lnkDemod.lastConfDb : 0,
+          );
+          lnkRaf = requestAnimationFrame(lnkAnim);
+        }
+
+        async function lnkOpenLink() {
+          const c = ensureCtx();
+          await c.resume();
+          if (listening) stopListening();
+          if (txPlaying) stopTx(true);
+          if (profileName === "ultrasonic") {
+            log(
+              "link: ultrasonic is single-channel — LINK pairs on the AUDIBLE band's CH A + CH B; switch BAND to AUDIBLE",
+              "r",
+            );
+            return;
+          }
+          if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            log(
+              "link: microphone API unavailable — use HTTPS or localhost",
+              "r",
+            );
+            return;
+          }
+          try {
+            lnkMic = await navigator.mediaDevices.getUserMedia({
+              audio: {
+                echoCancellation: false,
+                noiseSuppression: false,
+                autoGainControl: false,
+              },
+            });
+          } catch (e) {
+            log(
+              "link: " +
+                (e && e.name === "NotAllowedError"
+                  ? "microphone permission denied"
+                  : "microphone error — " + ((e && e.name) || e)),
+              "r",
+            );
+            return;
+          }
+          // pairing scan: listen on CH A first — hearing a carrier there
+          // makes us the CH B station; silence makes us the CH A caller
+          lnkRole = "scan";
+          lnkLinked = false;
+          lnkConfirmed = false;
+          lnkCarrier = false;
+          lnkBeatOnly = false;
+          lnkTxCh = 0;
+          lnkRxCh = 0;
+          lnkTailUntil = 0;
+          lnkNextBeat = 0;
+          lnkCtrl = [];
+          lnkNextEnq = 0;
+          lnkAckMuteUntil = 0;
+          lnkLastHeard = -1e9;
+          lnkScanDeadline = c.currentTime + LNK_SCAN_SEC + Math.random() * 1.5;
+          lnkRestartDemod();
+          lnkMicNode = c.createMediaStreamSource(lnkMic);
+          lnkTap = null;
+          let usingWorklet = false;
+          if (c.audioWorklet) {
+            try {
+              if (!workletReady) {
+                try {
+                  const url = URL.createObjectURL(
+                    new Blob([WORKLET_SRC], {
+                      type: "application/javascript",
+                    }),
+                  );
+                  await c.audioWorklet.addModule(url);
+                  URL.revokeObjectURL(url);
+                } catch (e) {
+                  await c.audioWorklet.addModule(
+                    "data:application/javascript;base64," + btoa(WORKLET_SRC),
+                  );
+                }
+                workletReady = true;
+              }
+              lnkTap = new AudioWorkletNode(c, "airgap-capture");
+              lnkTap.port.onmessage = (e) => lnkPush(e.data);
+              usingWorklet = true;
+            } catch (e) {
+              lnkTap = null;
+            }
+          }
+          if (!lnkTap) {
+            lnkTap = c.createScriptProcessor(4096, 1, 1);
+            lnkTap.onaudioprocess = (ev) =>
+              lnkPush(ev.inputBuffer.getChannelData(0));
+          }
+          lnkSink = c.createGain();
+          lnkSink.gain.value = 0; // keep the graph pulling without feedback
+          lnkMicNode.connect(lnkTap);
+          lnkTap.connect(lnkSink);
+          lnkSink.connect(c.destination);
+          lnkGain = c.createGain();
+          lnkGain.gain.value = txVolume;
+          lnkGain.connect(c.destination);
+          lnkOn = true;
+          lnkQueue = [];
+          lnkFifo = [];
+          lnkLastRecv = 0;
+          lnkYou = lnkThem = null;
+          $("lnkOpen").textContent = "■ CLOSE LINK";
+          $("lnkOpen").classList.remove("cool");
+          $("lnkOpen").classList.add("danger");
+          $("lnkTag").textContent = "SEARCHING";
+          $("monTag").textContent = "LINK";
+          $("lnkRateVal").textContent =
+            (1 / (2 * AirGap.SPEEDS[speedName].symbolSec)).toFixed(1) + " ch/s";
+          log(
+            "link open (" +
+              (usingWorklet ? "AudioWorklet" : "ScriptProcessor fallback") +
+              ") · " +
+              AirGap.PROFILES[profileName].label +
+              " · " +
+              AirGap.SPEEDS[speedName].label +
+              " · scanning CH A for a partner station",
+            "g",
+          );
+          lnkTimer = setInterval(lnkTick, 50);
+          lnkRaf = requestAnimationFrame(lnkAnim);
+          lnkLeds();
+          $("lnkInput").focus();
+        }
+
+        function lnkCloseLink() {
+          lnkOn = false;
+          lnkCarrier = false;
+          lnkRole = null;
+          lnkLinked = false;
+          lnkConfirmed = false;
+          lnkCtrl = [];
+          clearInterval(lnkTimer);
+          cancelAnimationFrame(lnkRaf);
+          if (lnkMic) lnkMic.getTracks().forEach((t) => t.stop());
+          try {
+            if (lnkMicNode) lnkMicNode.disconnect();
+          } catch (e) {}
+          try {
+            if (lnkTap) {
+              lnkTap.disconnect();
+              if (lnkTap.port) lnkTap.port.onmessage = null;
+              else lnkTap.onaudioprocess = null;
+            }
+          } catch (e) {}
+          try {
+            if (lnkSink) lnkSink.disconnect();
+          } catch (e) {}
+          try {
+            if (lnkGain) lnkGain.disconnect();
+          } catch (e) {}
+          lnkMic = lnkMicNode = lnkTap = lnkSink = lnkGain = null;
+          lnkDemod = null;
+          lnkQueue = [];
+          lnkFifo = [];
+          if (lnkYou) lnkYou._pend.textContent = "";
+          lnkYou = lnkThem = null;
+          $("lnkOpen").textContent = "◉ OPEN LINK";
+          $("lnkOpen").classList.add("cool");
+          $("lnkOpen").classList.remove("danger");
+          $("lnkTag").textContent = "OFFLINE";
+          $("monTag").textContent = txPlaying ? "SPKR OUT" : "IDLE";
+          if (!txPlaying && !listening) {
+            setMeters(-100, null);
+            clearScope();
+          }
+          $("lnkQueueVal").textContent = "0";
+          lnkLeds();
+          log("link closed");
+        }
+        on("lnkOpen", "click", () => (lnkOn ? lnkCloseLink() : lnkOpenLink()));
+
         // ---- RX visualization ----
         // shared LVL / CNF meters (CNF is decoder-only: null while transmitting)
         function setMeters(rmsDb, confDb) {
@@ -4969,7 +6201,8 @@ registerProcessor('airgap-capture', AirgapCapture);`;
             if (s.profile === "audible" || s.profile === "ultrasonic")
               setProfile(s.profile);
             if (typeof s.auto === "boolean") setAutoRx(s.auto);
-            if (s.mode === "rx" || s.mode === "tx") setMode(s.mode);
+            if (s.mode === "rx" || s.mode === "tx" || s.mode === "link")
+              setMode(s.mode);
             log("settings restored from previous session");
           } finally {
             restoring = false;
