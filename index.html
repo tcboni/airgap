@@ -1452,11 +1452,11 @@ Hello across the air gap 📡</textarea
                 <div
                   class="knobunit"
                   id="volUnit"
-                  data-tip="Speaker output volume. Default 60% — turn the device's own volume up and lower this only if the receiver's LVL meter stays pinned at max (clipping). Click or drag to aim, arrow keys when focused. Local setting — no need to match. Disabled while receiving."
+                  data-tip="Speaker output volume. Default 70% — turn the device's own volume up and lower this only if the receiver's LVL meter stays pinned at max (clipping). Click or drag to aim, arrow keys when focused. Local setting — no need to match. Disabled while receiving."
                 >
                   <div class="klabel">VOLUME</div>
                   <div id="knobVol"></div>
-                  <div class="kvalue" id="volVal">60%</div>
+                  <div class="kvalue" id="volVal">70%</div>
                 </div>
               </div>
             </div>
@@ -3520,7 +3520,7 @@ NO FRAME RECEIVED YET</pre
         let speedName = "fast";
         let fecParity = 32; // HIGH — RS parity bytes per block (protocol param)
         let channelIdx = 0; // A/B/C tone-plan offset (protocol param)
-        let txVolume = 0.6; // local output level
+        let txVolume = 0.7; // local output level
         let autoRx = true; // receiver auto-detects band/channel/speed (default on)
         let mode = "tx";
         // Starts true so boot-time setter calls can't clobber the saved state;
