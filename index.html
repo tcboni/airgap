@@ -905,7 +905,7 @@
         border-color: #7a2a24;
         background: rgba(255, 80, 64, 0.04);
       }
-      /* frame inspector dumps (diagnostics) */
+      /* frame inspector dumps */
       .inspwrap {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -981,47 +981,6 @@
         animation: blink 1.1s steps(2) infinite;
       }
 
-      /* diagnostics */
-      .diagout {
-        font-size: 11px;
-        margin-top: 10px;
-      }
-      .diagout div {
-        padding: 2px 0;
-        border-bottom: 1px dotted #1c2018;
-        color: var(--dim);
-      }
-      .diagout .p::before {
-        content: "PASS ";
-        color: var(--green);
-        letter-spacing: 0.1em;
-      }
-      .diagout .f::before {
-        content: "FAIL ";
-        color: var(--red);
-        letter-spacing: 0.1em;
-      }
-      .diagout .s::before {
-        content: "soft ";
-        color: var(--amber);
-        letter-spacing: 0.1em;
-      }
-      .badge {
-        display: inline-block;
-        padding: 2px 10px;
-        border-radius: 3px;
-        font-size: 10px;
-        letter-spacing: 0.2em;
-        margin-left: 8px;
-      }
-      .badge.ok {
-        color: var(--green);
-        border: 1px solid var(--green-dim);
-      }
-      .badge.bad {
-        color: var(--red);
-        border: 1px solid #7a2a24;
-      }
 
       /* ---- tooltips: CSS-only, via CSS anchor positioning (no JS) ---- */
       [data-tip] {
@@ -1508,13 +1467,12 @@ Hello across the air gap 📡</textarea
         </div>
       </section>
 
-      <!-- ================= DIAGNOSTICS ================= -->
-      <section class="panel" id="diagPanel">
+      <!-- ================= INSPECTOR ================= -->
+      <section class="panel" id="inspPanel">
         <span class="screw tl"></span><span class="screw tr"></span
         ><span class="screw bl"></span><span class="screw br"></span>
         <div class="plabel">
-          <b>◤ DIAGNOSTICS</b> IN-MEMORY MODEM VERIFICATION
-          <span class="tag">NO AUDIO USED</span>
+          <b>◤ INSPECTOR</b> LAST FRAME SENT · LAST FRAME RECEIVED
         </div>
         <div class="readouts">
           <div
@@ -1532,22 +1490,6 @@ Hello across the air gap 📡</textarea
             <div class="v" id="rateVal">8.3 B/s</div>
           </div>
         </div>
-        <div class="btnrow">
-          <button
-            id="diagLoop"
-            data-tip="Encodes a test message and pipes the samples straight into the decoder in memory — no speaker or microphone involved. Uses the currently selected band and speed. Validates the whole modem on one device."
-          >
-            ▸ LOOPBACK SELF-TEST
-          </button>
-          <button
-            id="diagFull"
-            data-tip="Runs the complete suite: CRC test vectors, Reed-Solomon error-injection (corrects 16 errors per block), FFT sanity, and modulate→demodulate round trips with noise and clock drift. Same as opening the page with ?selftest."
-          >
-            ▸ FULL TEST SUITE
-          </button>
-          <span id="diagBadge"></span>
-        </div>
-        <div class="diagout" id="diagOut"></div>
         <div class="inspwrap">
           <pre
             class="out insp amber"
@@ -1573,8 +1515,7 @@ NO FRAME RECEIVED YET</pre
         RECEIVER · ULTRASONIC IS HARDWARE-DEPENDENT · HOVER ANY CONTROL FOR HELP
       </div>
       <footer>
-        SINGLE FILE · WORKS OFFLINE · ADD ?selftest TO URL FOR FULL DIAGNOSTIC
-        BOOT ·
+        SINGLE FILE · WORKS OFFLINE ·
         <a
           href="https://github.com/tcboni/airgap"
           target="_blank"
@@ -1591,9 +1532,9 @@ NO FRAME RECEIVED YET</pre
 
     <script>
       /* ==== BEGIN AIRGAP CORE ====
-       * AirGap core DSP — pure JS, no browser APIs, usable in Node for testing.
+       * AirGap core DSP — pure JS, no browser APIs, usable in Node.
        * Sections: CRC, Reed-Solomon, FFT, Params/Profiles, Framing, Modulator,
-       * Demodulator, Loopback & self-tests.
+       * Demodulator.
        */
       (function (root, factory) {
         const api = factory();
@@ -2096,10 +2037,147 @@ NO FRAME RECEIVED YET</pre
         // ---- Demodulator ----
 
         // Detection thresholds (power ratios)
-        const TONE_THR = 25; // tone power vs band noise floor
+        const TONE_THR = 25; // tone power vs noise floor
         const DOM_THR = 4; // dominance of one preamble tone over the other
-        const DUAL_MIN = 0.25; // min/max power ratio for the dual-tone sync marker
+        const DUAL_MIN = 0.25; // min/max level ratio for the dual-tone sync marker
         const EL_IMBALANCE = 0.15; // early-late gate deadband
+        // Preamble lock (see rhythmLock)
+        const LOCK_SYMS = 6; // correlation window: 3 alternation periods
+        const LOCK_CORR = 0.55; // min correlation of the P0/P1 level difference
+        const LOCK_TONE_CORR = 0.3; // min correlation of each tone on its own
+        const LOCK_ACTIVE = 0.7; // min share of frames with a marker tone present
+        const LOCK_BACK = 4; // symbols to rewind after lock (it fires late)
+        const ECHO_SUB = 0.5; // share of the previous symbol's tones removed per pick
+
+        // Noise floor around one marker bin: median of the bins 3..10 away on
+        // both sides. Broadband bursts (clicks, hi-hats, fricatives) lift it as
+        // much as the marker bin, so they never pass as a tone.
+        function localFloor(pow, bin, scratch) {
+          const last = pow.length - 1;
+          let n = 0;
+          for (let k = 3; k <= 10; k++) {
+            scratch[n++] = pow[Math.max(1, bin - k)];
+            scratch[n++] = pow[Math.min(last, bin + k)];
+          }
+          scratch.sort();
+          return Math.max(scratch[8], 1e-10);
+        }
+
+        // One analysis frame for rhythmLock. Levels are logs of each tone's
+        // power over its own decaying peak, so a speaker/mic/room gain
+        // difference between P0 and P1 cancels out. `st` carries pk0, pk1 and
+        // pkDecay; t0/t1 are the tone-present thresholds.
+        function markerFrame(st, t, p0, p1, t0, t1) {
+          st.pk0 = Math.max(p0, st.pk0 * st.pkDecay, t0);
+          st.pk1 = Math.max(p1, st.pk1 * st.pkDecay, t1);
+          return {
+            t,
+            l0: Math.log10(Math.max(p0 / st.pk0, 0.01)),
+            l1: Math.log10(Math.max(p1 / st.pk1, 0.01)),
+            on0: p0 > t0,
+            on1: p1 > t1,
+          };
+        }
+
+        // Cheap pre-check for rhythmLock: enough frames with a marker tone, and
+        // each tone in a fifth of them (rhythmLock wants it in half of its own
+        // half-periods)
+        function markersPresent(hist, from) {
+          const n = hist.length - from;
+          let any = 0,
+            c0 = 0,
+            c1 = 0;
+          for (let i = from; i < hist.length; i++) {
+            const h = hist[i];
+            if (h.on0) c0++;
+            if (h.on1) c1++;
+            if (h.on0 || h.on1) any++;
+          }
+          return any >= LOCK_ACTIVE * n && c0 >= 0.2 * n && c1 >= 0.2 * n;
+        }
+
+        // Preamble test over hist[from..]: correlates the frames with the
+        // alternating P0/P1 rhythm (a square wave of period 2*S) at 32 phases.
+        // Echo tails and room notches wreck per-frame "which tone is louder"
+        // decisions, but the rhythm survives them. Returns { phi, score } —
+        // phi is a time where a P0 symbol starts — or null.
+        function rhythmLock(hist, from, S) {
+          const n = hist.length - from;
+          let nOn = 0,
+            m0 = 0,
+            m1 = 0;
+          for (let i = from; i < hist.length; i++) {
+            const h = hist[i];
+            if (h.on0 || h.on1) nOn++;
+            m0 += h.l0;
+            m1 += h.l1;
+          }
+          if (nOn < LOCK_ACTIVE * n) return null;
+          m0 /= n;
+          m1 /= n;
+          let a0 = 0,
+            a1 = 0,
+            ar = 0;
+          for (let i = from; i < hist.length; i++) {
+            const d0 = hist[i].l0 - m0,
+              d1 = hist[i].l1 - m1;
+            a0 += Math.abs(d0);
+            a1 += Math.abs(d1);
+            ar += Math.abs(d0 - d1);
+          }
+          if (a0 <= 0 || a1 <= 0 || ar <= 0) return null;
+          const tEnd = hist[hist.length - 1].t;
+          let best = -Infinity,
+            phi = 0,
+            c0Best = 0,
+            c1Best = 0;
+          for (let s = 0; s < 32; s++) {
+            const ph = tEnd - (s * S) / 16;
+            let c0 = 0,
+              c1 = 0;
+            for (let i = from; i < hist.length; i++) {
+              const h = hist[i];
+              let x = (h.t - ph) % (2 * S);
+              if (x < 0) x += 2 * S;
+              const sq = x < S ? 1 : -1;
+              c0 += sq * (h.l0 - m0);
+              c1 -= sq * (h.l1 - m1);
+            }
+            if (c0 + c1 > best) {
+              best = c0 + c1;
+              phi = ph;
+              c0Best = c0 / a0;
+              c1Best = c1 / a1;
+            }
+          }
+          const score = best / ar;
+          if (
+            score < LOCK_CORR ||
+            c0Best < LOCK_TONE_CORR ||
+            c1Best < LOCK_TONE_CORR
+          )
+            return null;
+          // each tone must really sound in its own half of the rhythm: a steady
+          // tone near P0 plus noise bursts near P1 can correlate, but fails here
+          let n0 = 0,
+            h0 = 0,
+            n1 = 0,
+            h1 = 0;
+          for (let i = from; i < hist.length; i++) {
+            const h = hist[i];
+            let x = (h.t - phi) % (2 * S);
+            if (x < 0) x += 2 * S;
+            if (x < S) {
+              n0++;
+              if (h.on0) h0++;
+            } else {
+              n1++;
+              if (h.on1) h1++;
+            }
+          }
+          if (h0 < 0.5 * n0 || h1 < 0.5 * n1) return null;
+          return { phi, score };
+        }
 
         class Demodulator {
           constructor(fs, profileName, cb, speedName, extra) {
@@ -2120,6 +2198,15 @@ NO FRAME RECEIVED YET</pre
             this.win = hannWindow(this.p.fftSize);
             this.pow = new Float32Array(this.p.fftSize >> 1); // last spectrum (for UI)
             this.scratch = new Float32Array(this.p.bandHi - this.p.bandLo + 1);
+            this.fscratch = new Float64Array(16);
+            this.lockHops = Math.round(
+              (LOCK_SYMS * this.p.symbolLen) / this.p.hop,
+            );
+            // marker peak levels fall 6 dB over 4 symbols
+            this.pkDecay = Math.pow(
+              10,
+              -0.6 / ((4 * this.p.symbolLen) / this.p.hop),
+            );
             this.lastRms = 0;
             this.lastConfDb = 0;
             this._toListening();
@@ -2132,6 +2219,11 @@ NO FRAME RECEIVED YET</pre
 
           _toListening() {
             this.hist = [];
+            this.pk0 = 0;
+            this.pk1 = 0;
+            this.ref0 = 1;
+            this.ref1 = 1;
+            this.prevTones = null;
             this.nibbles = [];
             this.confs = [];
             this.expected = 0;
@@ -2258,12 +2350,14 @@ NO FRAME RECEIVED YET</pre
           }
 
           // Fine symbol-clock phase search. The lock phase from _tryLock is
-          // hop-quantized (can be off by a large fraction of a symbol) and the
-          // early-late gate corrects too slowly to converge before the header.
-          // Scan ±half a symbol for the offset where one preamble tone most
-          // dominates the other: |e0-e1| peaks when the analysis window sits
-          // fully inside one alternating-tone symbol and collapses when it
-          // straddles a boundary (both tones present).
+          // coarse (1/16 symbol) and biased by echo, and the early-late gate
+          // corrects too slowly to converge before the header. Scan ±half a
+          // symbol for the offset where one preamble tone most dominates the
+          // other: |e0-e1| peaks when the analysis window sits fully inside one
+          // alternating-tone symbol and collapses when it straddles a boundary
+          // (both tones present). Levels are relative to each tone's reference:
+          // on raw powers, a tone that arrives much louder than the other pulls
+          // the peak onto the boundaries.
           _refinePhase() {
             const P = this.p,
               half = P.fftSize >> 1;
@@ -2272,7 +2366,8 @@ NO FRAME RECEIVED YET</pre
             const metricAt = (c) => {
               const pow = this._spectrumAt(c);
               return Math.abs(
-                this._tonePow(pow, P.binP0) - this._tonePow(pow, P.binP1),
+                this._tonePow(pow, P.binP0) / this.ref0 -
+                  this._tonePow(pow, P.binP1) / this.ref1,
               );
             };
             const m0 = metricAt(this.symCenter);
@@ -2303,27 +2398,35 @@ NO FRAME RECEIVED YET</pre
             const c = this.symCenter - P.symbolLen;
             if (c - half < 0 || c - half < this.total - this.cap) return true; // no history — can't verify
             const pow = this._spectrumAt(c);
-            const e0 = this._tonePow(pow, P.binP0);
-            const e1 = this._tonePow(pow, P.binP1);
+            const e0 = this._tonePow(pow, P.binP0) / this.ref0;
+            const e1 = this._tonePow(pow, P.binP1) / this.ref1;
             return Math.max(e0, e1) > DOM_THR * Math.min(e0, e1);
           }
 
           // Strongest of the 16 data tones in a spectrum + confidence (dB over
-          // the runner-up tone)
+          // the runner-up tone). Echo of the previous symbol's tone lingers
+          // into this one and can outweigh a tone in a room notch, so ECHO_SUB
+          // of the previous read's tone powers (prevTones) is removed first.
+          // Callers reset prevTones where a read sequence starts.
           _pickTone(pow) {
-            const P = this.p;
+            const P = this.p,
+              prev = this.prevTones,
+              cur = new Float32Array(16);
             let best = 0,
-              bestPow = -1,
-              secondPow = 0;
+              bestScore = -Infinity,
+              secondScore = -Infinity;
             for (let k = 0; k < 16; k++) {
-              const v = this._tonePow(pow, P.dataBins[k]);
-              if (v > bestPow) {
-                secondPow = bestPow;
-                bestPow = v;
+              cur[k] = this._tonePow(pow, P.dataBins[k]);
+              const v = prev ? cur[k] - ECHO_SUB * prev[k] : cur[k];
+              if (v > bestScore) {
+                secondScore = bestScore;
+                bestScore = v;
                 best = k;
-              } else if (v > secondPow) secondPow = v;
+              } else if (v > secondScore) secondScore = v;
             }
-            const conf = bestPow / Math.max(secondPow, 1e-10);
+            this.prevTones = cur;
+            const conf =
+              bestScore / Math.max(secondScore, bestScore * 1e-3, 1e-10);
             return { nib: best, conf: 10 * Math.log10(Math.max(conf, 1)) };
           }
 
@@ -2366,55 +2469,47 @@ NO FRAME RECEIVED YET</pre
             }
             const center = end - (P.fftSize >> 1);
             const pow = this._spectrumAt(center);
-            const floor = this._floor(pow);
-            const p0 = this._tonePow(pow, P.binP0);
-            const p1 = this._tonePow(pow, P.binP1);
-            let cls = -1;
-            if (p0 > TONE_THR * floor && p0 > DOM_THR * p1) cls = 0;
-            else if (p1 > TONE_THR * floor && p1 > DOM_THR * p0) cls = 1;
-            this.hist.push({ t: center, cls });
-            if (this.hist.length > 120) this.hist.shift();
+            const s = this.fscratch;
+            this.hist.push(
+              markerFrame(
+                this,
+                center,
+                this._tonePow(pow, P.binP0),
+                this._tonePow(pow, P.binP1),
+                TONE_THR * localFloor(pow, P.binP0, s),
+                TONE_THR * localFloor(pow, P.binP1, s),
+              ),
+            );
+            if (this.hist.length > this.lockHops) this.hist.shift();
             this.nextHop += P.hop;
             this._tryLock();
             return true;
           }
 
-          // Estimate symbol boundaries from transitions between alternating preamble
-          // tones and lock the symbol clock once boundary spacing matches symbolLen.
+          // Lock the symbol clock once the last LOCK_SYMS symbols carry the
+          // preamble rhythm (see rhythmLock). That takes most of the 8-symbol
+          // preamble, so tracking restarts LOCK_BACK symbols back in the ring,
+          // which keeps the sync marker ahead of it.
           _tryLock() {
-            const P = this.p;
-            const runs = [];
-            for (const h of this.hist) {
-              const last = runs[runs.length - 1];
-              if (last && last.cls === h.cls) {
-                last.tEnd = h.t;
-                last.n++;
-              } else runs.push({ cls: h.cls, tStart: h.t, tEnd: h.t, n: 1 });
-            }
-            // tone runs only; short "neither" gaps around boundaries are skipped
-            const tone = runs.filter((r) => r.cls >= 0 && r.n >= 2);
-            const bounds = [];
-            for (let i = 1; i < tone.length; i++) {
-              const a = tone[i - 1],
-                b = tone[i];
-              if (a.cls === b.cls) continue;
-              const gap = b.tStart - a.tEnd;
-              if (gap < 0 || gap > P.symbolLen * 0.8) continue;
-              bounds.push((a.tEnd + b.tStart) / 2);
-            }
-            if (bounds.length < 3) return;
-            const d1 = bounds[bounds.length - 1] - bounds[bounds.length - 2];
-            const d2 = bounds[bounds.length - 2] - bounds[bounds.length - 3];
-            const ok = (d) => d > P.symbolLen * 0.7 && d < P.symbolLen * 1.3;
-            if (!ok(d1) || !ok(d2)) return;
-            this.symCenter = Math.round(
-              bounds[bounds.length - 1] + P.symbolLen / 2,
-            );
+            const S = this.p.symbolLen;
+            if (
+              this.hist.length < this.lockHops ||
+              !markersPresent(this.hist, 0)
+            )
+              return;
+            const lock = rhythmLock(this.hist, 0, S);
+            if (!lock) return;
+            const tEnd = this.hist[this.hist.length - 1].t;
+            let b = lock.phi;
+            while (b + S <= tEnd) b += S;
+            this.symCenter = Math.round(b - LOCK_BACK * S + S / 2);
+            this.ref0 = this.pk0;
+            this.ref1 = this.pk1;
             this.hist = [];
             this.preTicks = 0;
             this.missTicks = 0;
-            // boundary estimates are hop-quantized; snap the phase properly
-            // before the first symbol read (see _refinePhase)
+            // the lock phase is coarse; snap it properly before the first
+            // symbol read (see _refinePhase)
             this.refine = true;
             this.straddleRefines = 0;
             this._setState("PREAMBLE");
@@ -2443,14 +2538,20 @@ NO FRAME RECEIVED YET</pre
             const p1 = this._tonePow(pow, P.binP1);
 
             if (this.state === "PREAMBLE") {
-              const mx = Math.max(p0, p1),
-                mn = Math.min(p0, p1);
-              if (mn > DUAL_MIN * mx && mn > 8 * floor) {
+              // levels relative to each tone's reference: the two tones can
+              // arrive 10+ dB apart (speaker/mic response, room), while the
+              // sync marker sends both at equal strength
+              const n0 = p0 / this.ref0,
+                n1 = p1 / this.ref1;
+              const mx = Math.max(n0, n1),
+                mn = Math.min(n0, n1);
+              if (mn > DUAL_MIN * mx && Math.min(p0, p1) > 8 * floor) {
                 if (this._prevSymbolSingle()) {
                   // sync marker: header starts on the next symbol
                   this.nibbles = [];
                   this.confs = [];
                   this.expected = 12 * 2;
+                  this.prevTones = null;
                   this._setState("HEADER");
                   this.symCenter += P.symbolLen;
                   this.hdrStart = this.symCenter;
@@ -2466,18 +2567,21 @@ NO FRAME RECEIVED YET</pre
                 }
                 // still ambiguous — fall through and track as preamble
               }
-              if (mx > TONE_THR * floor) {
+              if (Math.max(p0, p1) > TONE_THR * floor) {
+                // a single-tone symbol re-measures that tone's reference
+                if (n0 > n1) this.ref0 = 0.5 * (this.ref0 + p0);
+                else this.ref1 = 0.5 * (this.ref1 + p1);
                 this.preTicks++;
                 if (this.preTicks > 24) {
-                  this._toListening();
+                  this._fail("NO_SYNC");
                   return true;
                 }
                 this.symCenter +=
-                  P.symbolLen + this._clockAdjust(p0 > p1 ? P.fp0 : P.fp1);
+                  P.symbolLen + this._clockAdjust(n0 > n1 ? P.fp0 : P.fp1);
                 return true;
               }
               if (++this.missTicks > 2) {
-                this._toListening();
+                this._fail("NO_SYNC");
                 return true;
               }
               this.symCenter += P.symbolLen;
@@ -2560,10 +2664,15 @@ NO FRAME RECEIVED YET</pre
             }
             // header didn't verify on the tracked symbol grid — before
             // rejecting the frame, re-read it from the ring at shifted grids:
-            // fractional offsets cover a clock that locked off-center, ±1
-            // whole symbol covers a sync marker that fired early/late
+            // fractional offsets cover a clock that locked off-center, whole
+            // symbols a sync marker that fired early/late. Echo can pass a
+            // preamble symbol off as the marker several symbols early, hence
+            // up to +7. RS + CRC-16 reject the wrong grids.
             const s = this.p.symbolLen;
-            this.retryOffsets = [-(s >> 2), s >> 2, -(s >> 1), s >> 1, -s, s];
+            this.retryOffsets = [];
+            for (const k of [0, -1, 1, 2, 3, 4, 5, 6, 7])
+              for (const f of [0, -0.25, 0.25, -0.5, 0.5])
+                if (k || f) this.retryOffsets.push(Math.round((k + f) * s));
             this.retryIdx = 0;
             // internal state only (no _setState): the UI keeps showing HEADER
             this.state = "HEADER_RETRY";
@@ -2578,6 +2687,7 @@ NO FRAME RECEIVED YET</pre
               if (lastC + half + 1 > this.total) return false; // wait for audio
               this.retryIdx++;
               if (this.hdrStart + off - half < this.total - this.cap) continue; // start of header already overwritten in the ring
+              this.prevTones = null;
               const nibs = [],
                 confs = [];
               for (let k = 0; k < 24; k++) {
@@ -2682,17 +2792,17 @@ NO FRAME RECEIVED YET</pre
 
         // ---- Auto-detecting receiver ----
         //
-        // Scans every candidate tone plan (band x channel) at once, measures
-        // the preamble's alternation period to identify the speed preset, then
-        // spins up a real Demodulator with the detected settings and replays
-        // the buffered audio into it. FEC needs no detection — it travels in
-        // the frame header.
+        // Scans every candidate tone plan (band x channel) at once and runs the
+        // preamble rhythm test (rhythmLock) at each speed preset's period, then
+        // spins up a real Demodulator with the best match and replays the
+        // buffered audio into it. FEC needs no detection — it travels in the
+        // frame header.
         class AutoDemodulator {
           constructor(fs, cb) {
             this.fs = fs;
             this.cb = cb || {};
             this.fftSize = 1024;
-            this.hopSize = 128; // fine-grained so 30 ms vs 40 ms symbols separate
+            this.hopSize = 128; // fine rhythm phase steps at the fastest speed
             this.win = hannWindow(this.fftSize);
             this.re = new Float32Array(this.fftSize);
             this.im = new Float32Array(this.fftSize);
@@ -2709,6 +2819,25 @@ NO FRAME RECEIVED YET</pre
             this.inner = null;
             this.innerIdle = 0;
             this.dropAfterResult = false;
+            this.cands = new Map(); // passing (plan, speed) -> best score
+            this.candSince = 0;
+            this.fscratch = new Float64Array(16);
+
+            this.speedList = Object.keys(SPEEDS).map((name) => {
+              const len = Math.round(SPEEDS[name].symbolSec * fs);
+              return {
+                name,
+                len,
+                hops: Math.round((LOCK_SYMS * len) / this.hopSize),
+              };
+            });
+            const maxLen = Math.max(...this.speedList.map((s) => s.len));
+            this.maxHops = Math.max(...this.speedList.map((s) => s.hops));
+            // a faster preset's window fills first, and its test can pass on
+            // part of a slower preamble: decide once the slowest window is full
+            this.decideDelay = LOCK_SYMS * maxLen;
+            // marker peak levels fall 6 dB over 4 of the slowest symbols
+            const pkDecay = Math.pow(10, -0.6 / ((4 * maxLen) / this.hopSize));
 
             const binOf = (f) => Math.round((f * this.fftSize) / fs);
             this.plans = [];
@@ -2725,14 +2854,12 @@ NO FRAME RECEIVED YET</pre
                   b0: binOf(prof.fp0 + off),
                   b1: binOf(prof.fp1 + off),
                   hist: [],
+                  pk0: 0,
+                  pk1: 0,
+                  pkDecay,
                 });
               }
             }
-            this.speedList = Object.keys(SPEEDS).map((name) => ({
-              name,
-              len: Math.round(SPEEDS[name].symbolSec * fs),
-            }));
-            this.maxSymbolLen = Math.max(...this.speedList.map((s) => s.len));
             // synthetic display params while scanning (full band, no ticks)
             this._p = {
               fs,
@@ -2794,17 +2921,24 @@ NO FRAME RECEIVED YET</pre
           _watchInner(n) {
             if (this.dropAfterResult || this.inner.state === "LISTENING") {
               this.innerIdle += n;
-              // nothing decoding for a while: go back to wide-band scanning
-              if (this.innerIdle > this.fs * 2.5 || this.dropAfterResult) {
-                if (this.dropAfterResult || this.inner.state === "LISTENING") {
-                  this.inner = null;
-                  this.dropAfterResult = false;
-                  this.detected = null;
-                  for (const pl of this.plans) pl.hist = [];
-                  this.nextHop = this.total;
-                  this.state = "LISTENING";
-                  if (this.cb.onState) this.cb.onState("LISTENING");
+              // the scan saw a preamble, so the inner demodulator locks within
+              // a few symbols or never; until it is dropped, frames on other
+              // plans and speeds go unheard
+              if (
+                this.dropAfterResult ||
+                this.innerIdle > 12 * this.inner.p.symbolLen
+              ) {
+                this.inner = null;
+                this.dropAfterResult = false;
+                this.detected = null;
+                this.cands.clear();
+                for (const pl of this.plans) {
+                  pl.hist = [];
+                  pl.pk0 = pl.pk1 = 0;
                 }
+                this.nextHop = this.total;
+                this.state = "LISTENING";
+                if (this.cb.onState) this.cb.onState("LISTENING");
               }
             } else {
               this.innerIdle = 0;
@@ -2822,62 +2956,61 @@ NO FRAME RECEIVED YET</pre
             const pow = this._pow;
             for (let k = 0; k < half; k++)
               pow[k] = this.re[k] * this.re[k] + this.im[k] * this.im[k];
-            // broadband noise floor
-            const sorted = Array.from(pow.subarray(1, half - 1)).sort(
-              (a, b) => a - b,
-            );
-            const floor = Math.max(sorted[sorted.length >> 1], 1e-10);
             const center = this.nextHop - half;
             const tone = (b) => pow[b - 1] + pow[b] + pow[b + 1];
+            const s = this.fscratch;
             for (const pl of this.plans) {
-              const p0 = tone(pl.b0);
-              const p1 = tone(pl.b1);
-              let cls = -1;
-              if (p0 > TONE_THR * floor && p0 > DOM_THR * p1) cls = 0;
-              else if (p1 > TONE_THR * floor && p1 > DOM_THR * p0) cls = 1;
-              pl.hist.push({ t: center, cls });
-              if (pl.hist.length > 220) pl.hist.shift();
-              if (this._tryLockPlan(pl)) break;
-            }
-            this.nextHop += this.hopSize;
-          }
-
-          _tryLockPlan(pl) {
-            const runs = [];
-            for (const h of pl.hist) {
-              const last = runs[runs.length - 1];
-              if (last && last.cls === h.cls) {
-                last.tEnd = h.t;
-                last.n++;
-              } else runs.push({ cls: h.cls, tStart: h.t, tEnd: h.t, n: 1 });
-            }
-            const tone = runs.filter((r) => r.cls >= 0 && r.n >= 2);
-            const bounds = [];
-            for (let i = 1; i < tone.length; i++) {
-              const a = tone[i - 1],
-                b = tone[i];
-              if (a.cls === b.cls) continue;
-              const gap = b.tStart - a.tEnd;
-              if (gap < 0 || gap > this.maxSymbolLen * 0.8) continue;
-              bounds.push((a.tEnd + b.tStart) / 2);
-            }
-            if (bounds.length < 3) return false;
-            const d1 = bounds[bounds.length - 1] - bounds[bounds.length - 2];
-            const d2 = bounds[bounds.length - 2] - bounds[bounds.length - 3];
-            if (Math.abs(d1 - d2) > 0.2 * Math.max(d1, d2)) return false;
-            const d = (d1 + d2) / 2;
-            let best = null,
-              bestErr = 0.2; // nearest preset within 20 %
-            for (const s of this.speedList) {
-              const err = Math.abs(d - s.len) / s.len;
-              if (err < bestErr) {
-                bestErr = err;
-                best = s;
+              pl.hist.push(
+                markerFrame(
+                  pl,
+                  center,
+                  tone(pl.b0),
+                  tone(pl.b1),
+                  TONE_THR * localFloor(pow, pl.b0, s),
+                  TONE_THR * localFloor(pow, pl.b1, s),
+                ),
+              );
+              if (pl.hist.length > this.maxHops) pl.hist.shift();
+              for (const sp of this.speedList) {
+                const from = pl.hist.length - sp.hops;
+                if (from < 0 || !markersPresent(pl.hist, from)) continue;
+                const lock = rhythmLock(pl.hist, from, sp.len);
+                if (!lock) continue;
+                if (!this.cands.size) this.candSince = center;
+                const key = pl.profile + pl.channel + sp.name;
+                const c = this.cands.get(key);
+                if (!c || lock.score > c.score)
+                  this.cands.set(key, { pl, sp, score: lock.score });
               }
             }
-            if (!best) return false;
-            this._lock(pl, best.name);
-            return true;
+            this.nextHop += this.hopSize;
+            // the inner demodulator replays the ring, so waiting costs nothing
+            if (this.cands.size && center - this.candSince >= this.decideDelay) {
+              const c = this._bestCand();
+              this._lock(c.pl, c.sp.name);
+            }
+          }
+
+          // Best-scoring rhythm match. A slower preamble also passes the test
+          // at a half or a third of its period (odd harmonics, and even ones
+          // from echo), but a signal with period T has no energy at 2T or 3T:
+          // a passing preset with a 2x or 3x longer symbol on the same plan wins.
+          _bestCand() {
+            let best = null;
+            for (const c of this.cands.values())
+              if (!best || c.score > best.score) best = c;
+            let slower = null;
+            for (const c of this.cands.values()) {
+              const r = c.sp.len / best.sp.len;
+              if (
+                c.pl === best.pl &&
+                (Math.abs(r - 2) < 0.05 || Math.abs(r - 3) < 0.05) &&
+                (!slower || c.score > slower.score)
+              )
+                slower = c;
+            }
+            this.cands.clear();
+            return slower || best;
           }
 
           _lock(pl, speedName) {
@@ -2920,560 +3053,6 @@ NO FRAME RECEIVED YET</pre
           }
         }
 
-        // ---- Loopback & self-tests ----
-
-        function mulberry32(seed) {
-          let a = seed >>> 0;
-          return function () {
-            a |= 0;
-            a = (a + 0x6d2b79f5) | 0;
-            let t = Math.imul(a ^ (a >>> 15), 1 | a);
-            t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-          };
-        }
-
-        function gaussian(rand) {
-          const u = 1 - rand(),
-            v = rand();
-          return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
-        }
-
-        function resampleLinear(sig, ratio) {
-          const n = Math.floor((sig.length - 1) / ratio);
-          const out = new Float32Array(n);
-          for (let i = 0; i < n; i++) {
-            const x = i * ratio;
-            const j = Math.floor(x);
-            const f = x - j;
-            out[i] = sig[j] * (1 - f) + sig[j + 1] * f;
-          }
-          return out;
-        }
-
-        function rmsOf(sig) {
-          let s = 0;
-          for (let i = 0; i < sig.length; i++) s += sig[i] * sig[i];
-          return Math.sqrt(s / sig.length);
-        }
-
-        // In-memory TX->RX round trip (no audio hardware). Options:
-        //   snrDb: add white gaussian noise at this SNR; drift: resample ratio;
-        //   parity / channel: FEC and channel-plan overrides
-        function loopback(payload, fs, opts) {
-          opts = opts || {};
-          const extra = { parity: opts.parity, channel: opts.channel };
-          const p = makeParams(
-            fs,
-            opts.profile || "audible",
-            opts.speed,
-            extra,
-          );
-          let sig = modulate(payload, p, { amplitude: 0.8 });
-          if (opts.drift && opts.drift !== 1)
-            sig = resampleLinear(sig, opts.drift);
-          if (opts.snrDb != null) {
-            const rand = mulberry32(opts.seed || 0xa1b2c3);
-            const noiseRms = rmsOf(sig) / Math.pow(10, opts.snrDb / 20);
-            for (let i = 0; i < sig.length; i++)
-              sig[i] += gaussian(rand) * noiseRms;
-          }
-          let result = null;
-          const d = new Demodulator(
-            fs,
-            opts.profile || "audible",
-            {
-              onResult: (r) => {
-                if (!result) result = r;
-              },
-              onLiveByte: opts.onLiveByte,
-            },
-            opts.speed,
-            extra,
-          );
-          for (let off = 0; off < sig.length; off += 1024) {
-            d.push(sig.subarray(off, Math.min(off + 1024, sig.length)));
-          }
-          d.push(new Float32Array(Math.round(fs * 0.3)));
-          return { result, seconds: sig.length / fs };
-        }
-
-        // Like loopback(), but received through the auto-detecting demodulator
-        function autoLoopback(payload, fs, opts) {
-          opts = opts || {};
-          const extra = { parity: opts.parity, channel: opts.channel };
-          const p = makeParams(
-            fs,
-            opts.profile || "audible",
-            opts.speed,
-            extra,
-          );
-          let sig = modulate(payload, p, { amplitude: 0.8 });
-          if (opts.snrDb != null) {
-            const rand = mulberry32(opts.seed || 0xa1b2c3);
-            const noiseRms = rmsOf(sig) / Math.pow(10, opts.snrDb / 20);
-            for (let i = 0; i < sig.length; i++)
-              sig[i] += gaussian(rand) * noiseRms;
-          }
-          let result = null,
-            detected = null;
-          const d = new AutoDemodulator(fs, {
-            onResult: (r) => {
-              if (!result) result = r;
-            },
-            onAutoLock: (det) => {
-              if (!detected) detected = det;
-            },
-          });
-          for (let off = 0; off < sig.length; off += 1024) {
-            d.push(sig.subarray(off, Math.min(off + 1024, sig.length)));
-          }
-          d.push(new Float32Array(Math.round(fs * 0.3)));
-          return { result, detected, seconds: sig.length / fs };
-        }
-
-        function bytesEqual(a, b) {
-          if (!a || !b || a.length !== b.length) return false;
-          for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
-          return true;
-        }
-
-        function textBytes(s) {
-          if (typeof TextEncoder !== "undefined")
-            return new TextEncoder().encode(s);
-          const out = new Uint8Array(s.length);
-          for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i) & 0xff;
-          return out;
-        }
-
-        // Each test: { name, hard, run() -> {pass, detail} }
-        function selfTests() {
-          const rand = mulberry32(0xc0ffee);
-          const randBytes = (n) => {
-            const b = new Uint8Array(n);
-            for (let i = 0; i < n; i++) b[i] = Math.floor(rand() * 256);
-            return b;
-          };
-          const corrupt = (block, nErrors) => {
-            const c = Uint8Array.from(block);
-            const used = new Set();
-            for (let e = 0; e < nErrors; e++) {
-              let pos;
-              do {
-                pos = Math.floor(rand() * c.length);
-              } while (used.has(pos));
-              used.add(pos);
-              c[pos] ^= 1 + Math.floor(rand() * 255);
-            }
-            return c;
-          };
-          const T = [];
-          const test = (name, hard, run) => T.push({ name, hard, run });
-
-          test('CRC-16/CCITT test vector ("123456789" = 0x29B1)', true, () => {
-            const v = crc16(textBytes("123456789"));
-            return {
-              pass: v === 0x29b1,
-              detail: "0x" + v.toString(16).toUpperCase(),
-            };
-          });
-
-          test('CRC-32 test vector ("123456789" = 0xCBF43926)', true, () => {
-            const v = crc32(textBytes("123456789"));
-            return {
-              pass: v === 0xcbf43926,
-              detail: "0x" + v.toString(16).toUpperCase(),
-            };
-          });
-
-          test("FFT: pure sine lands in its bin", true, () => {
-            const N = 2048,
-              bin = 100;
-            const re = new Float32Array(N),
-              im = new Float32Array(N);
-            for (let n = 0; n < N; n++)
-              re[n] = Math.sin((2 * Math.PI * bin * n) / N);
-            fftInPlace(re, im);
-            let peak = 0,
-              pv = -1;
-            for (let k = 1; k < N / 2; k++) {
-              const p = re[k] * re[k] + im[k] * im[k];
-              if (p > pv) {
-                pv = p;
-                peak = k;
-              }
-            }
-            return { pass: peak === bin, detail: "peak at bin " + peak };
-          });
-
-          test("RS(255,223): clean round trip", true, () => {
-            const msg = randBytes(223);
-            const dec = rsDecode(rsEncode(msg, RS_PARITY), RS_PARITY);
-            const pass =
-              !!dec && bytesEqual(dec.data, msg) && dec.corrected === 0;
-            return { pass, detail: pass ? "ok" : "mismatch" };
-          });
-
-          test("RS(255,223): corrects 16 byte errors (20 trials)", true, () => {
-            for (let t = 0; t < 20; t++) {
-              const msg = randBytes(223);
-              const enc = rsEncode(msg, RS_PARITY);
-              const dec = rsDecode(corrupt(enc, 16), RS_PARITY);
-              if (!dec || !bytesEqual(dec.data, msg) || dec.corrected !== 16) {
-                return { pass: false, detail: "trial " + t + " failed" };
-              }
-            }
-            return { pass: true, detail: "20/20 corrected 16 errors" };
-          });
-
-          test("RS(255,223): rejects 17 byte errors (10 trials)", true, () => {
-            let nulls = 0,
-              miscorrect = 0;
-            for (let t = 0; t < 10; t++) {
-              const msg = randBytes(223);
-              const enc = rsEncode(msg, RS_PARITY);
-              const dec = rsDecode(corrupt(enc, 17), RS_PARITY);
-              if (dec === null) nulls++;
-              else if (!bytesEqual(dec.data, msg)) miscorrect++;
-              else
-                return {
-                  pass: false,
-                  detail: "impossibly recovered 17 errors",
-                };
-            }
-            return {
-              pass: nulls >= 8,
-              detail:
-                nulls +
-                "/10 rejected, " +
-                miscorrect +
-                " miscorrected (rare, caught by CRC-32)",
-            };
-          });
-
-          test(
-            "RS shortened header block (4+8): corrects 4 errors",
-            true,
-            () => {
-              for (let t = 0; t < 10; t++) {
-                const msg = randBytes(4);
-                const enc = rsEncode(msg, HDR_PARITY);
-                const dec = rsDecode(corrupt(enc, 4), HDR_PARITY);
-                if (!dec || !bytesEqual(dec.data, msg))
-                  return { pass: false, detail: "trial " + t + " failed" };
-              }
-              return { pass: true, detail: "10/10" };
-            },
-          );
-
-          test("RS shortened block (100+32): corrects 16 errors", true, () => {
-            const msg = randBytes(100);
-            const enc = rsEncode(msg, RS_PARITY);
-            const dec = rsDecode(corrupt(enc, 16), RS_PARITY);
-            const pass = !!dec && bytesEqual(dec.data, msg);
-            return { pass, detail: pass ? "ok" : "failed" };
-          });
-
-          const MSG50 = textBytes(
-            "THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG 0123456789",
-          ).slice(0, 50);
-
-          const modemTest = (name, hard, fs, opts, payload) => {
-            test(name, hard, () => {
-              const { result, seconds } = loopback(payload || MSG50, fs, opts);
-              const pass =
-                !!result &&
-                result.ok &&
-                bytesEqual(result.payload, payload || MSG50);
-              const detail = pass
-                ? seconds.toFixed(1) +
-                  "s audio, " +
-                  result.stats.corrected +
-                  " bytes corrected, conf min " +
-                  result.stats.minConfDb.toFixed(1) +
-                  " dB"
-                : result
-                  ? result.ok
-                    ? "payload mismatch"
-                    : "error: " + result.error
-                  : "no frame detected";
-              return { pass, detail, seconds };
-            });
-          };
-
-          modemTest(
-            "Loopback clean @ 48000 Hz (50-byte payload)",
-            true,
-            48000,
-            {},
-          );
-          modemTest("Loopback clean @ 44100 Hz", true, 44100, {});
-          modemTest(
-            "Loopback clean, ultrasonic profile @ 48000 Hz",
-            true,
-            48000,
-            { profile: "ultrasonic" },
-          );
-          modemTest("Loopback + white noise, SNR 20 dB", true, 48000, {
-            snrDb: 20,
-          });
-          modemTest("Loopback + white noise, SNR 10 dB", true, 48000, {
-            snrDb: 10,
-          });
-          modemTest("Loopback + white noise, SNR 6 dB", true, 48000, {
-            snrDb: 6,
-          });
-          modemTest(
-            "Loopback + white noise, SNR 3 dB (stretch)",
-            false,
-            48000,
-            { snrDb: 3 },
-          );
-          modemTest("Loopback + clock drift +0.2% (2000 ppm)", true, 48000, {
-            drift: 1.002,
-          });
-          modemTest("Loopback + clock drift -0.2% + noise 20 dB", true, 48000, {
-            drift: 0.998,
-            snrDb: 20,
-          });
-          modemTest(
-            "Loopback ultrasonic + white noise, SNR 10 dB",
-            true,
-            48000,
-            { profile: "ultrasonic", snrDb: 10 },
-          );
-          modemTest(
-            "Loopback multi-block payload (300 bytes) @ 48000 Hz",
-            true,
-            48000,
-            { snrDb: 20 },
-            randBytes(300),
-          );
-          modemTest(
-            "Loopback 1-byte payload",
-            true,
-            48000,
-            {},
-            new Uint8Array([0x42]),
-          );
-          modemTest("Loopback FAST (1.5x) clean @ 48000 Hz", true, 48000, {
-            speed: "fast",
-          });
-          modemTest(
-            "Loopback FAST (1.5x) + white noise, SNR 10 dB",
-            true,
-            48000,
-            { speed: "fast", snrDb: 10 },
-          );
-          modemTest("Loopback TURBO (2.25x) clean @ 48000 Hz", true, 48000, {
-            speed: "turbo",
-          });
-          modemTest("Loopback TURBO (2.25x) clean @ 44100 Hz", true, 44100, {
-            speed: "turbo",
-          });
-          modemTest(
-            "Loopback TURBO (2.25x) + white noise, SNR 10 dB",
-            true,
-            48000,
-            { speed: "turbo", snrDb: 10 },
-          );
-          modemTest("Loopback TURBO (2.25x) + clock drift +0.2%", true, 48000, {
-            speed: "turbo",
-            drift: 1.002,
-          });
-          modemTest(
-            "Loopback TURBO (2.25x) ultrasonic @ 48000 Hz",
-            true,
-            48000,
-            { speed: "turbo", profile: "ultrasonic" },
-          );
-          modemTest("Loopback MAX (3x) clean @ 48000 Hz", true, 48000, {
-            speed: "max",
-          });
-          modemTest("Loopback MAX (3x) clean @ 44100 Hz", true, 44100, {
-            speed: "max",
-          });
-          modemTest("Loopback MAX (3x) + white noise, SNR 10 dB", true, 48000, {
-            speed: "max",
-            snrDb: 10,
-          });
-          modemTest("Loopback MAX (3x) + clock drift +0.2%", true, 48000, {
-            speed: "max",
-            drift: 1.002,
-          });
-          modemTest(
-            "Loopback MAX (3x) ultrasonic @ 48000 Hz (stretch)",
-            false,
-            48000,
-            { speed: "max", profile: "ultrasonic" },
-          );
-          modemTest(
-            "Loopback FEC LOW (8 parity) clean @ 48000 Hz",
-            true,
-            48000,
-            {
-              parity: 8,
-            },
-          );
-          modemTest(
-            "Loopback FEC MED (16 parity) + white noise, SNR 10 dB",
-            true,
-            48000,
-            { parity: 16, snrDb: 10 },
-          );
-          modemTest(
-            "Loopback channel B (+3.8 kHz) + white noise, SNR 10 dB",
-            true,
-            48000,
-            { channel: 1, snrDb: 10 },
-          );
-          modemTest(
-            "Loopback channel C (+7.6 kHz) clean @ 44100 Hz",
-            true,
-            44100,
-            {
-              channel: 2,
-            },
-          );
-
-          test(
-            "FEC travels in the header (TX 8 parity, RX unconfigured)",
-            true,
-            () => {
-              const p8 = makeParams(48000, "audible", "fast", { parity: 8 });
-              const sig = modulate(MSG50, p8, { amplitude: 0.8 });
-              let result = null;
-              const d = new Demodulator(
-                48000,
-                "audible",
-                {
-                  onResult: (r) => {
-                    if (!result) result = r;
-                  },
-                },
-                "fast",
-              );
-              for (let off = 0; off < sig.length; off += 1024)
-                d.push(sig.subarray(off, Math.min(off + 1024, sig.length)));
-              d.push(new Float32Array(14400));
-              const pass =
-                !!result && result.ok && bytesEqual(result.payload, MSG50);
-              return {
-                pass,
-                detail: pass
-                  ? "decoded with rxParity=8 taken from header"
-                  : "failed",
-              };
-            },
-          );
-
-          const autoTest = (name, hard, fs, opts) => {
-            test(name, hard, () => {
-              const { result, detected, seconds } = autoLoopback(
-                MSG50,
-                fs,
-                opts,
-              );
-              const wantProfile = opts.profile || "audible";
-              const wantCh = opts.channel || 0;
-              const wantSpeed = opts.speed || "normal";
-              const okPayload =
-                !!result && result.ok && bytesEqual(result.payload, MSG50);
-              const okDet =
-                !!detected &&
-                detected.profile === wantProfile &&
-                detected.channel === wantCh &&
-                detected.speed === wantSpeed;
-              const detail =
-                okPayload && okDet
-                  ? "detected " +
-                    detected.profile +
-                    " ch" +
-                    "ABC"[detected.channel] +
-                    " " +
-                    detected.speed +
-                    " · " +
-                    seconds.toFixed(1) +
-                    "s"
-                  : !detected
-                    ? "no auto-lock"
-                    : !okDet
-                      ? "wrong detection: " + JSON.stringify(detected)
-                      : "payload failed: " + (result ? result.error : "none");
-              return { pass: okPayload && okDet, detail };
-            });
-          };
-          autoTest("AUTO-RX: audible ch A, normal, FEC 32", true, 48000, {});
-          autoTest("AUTO-RX: audible ch B, fast, FEC 16", true, 48000, {
-            channel: 1,
-            speed: "fast",
-            parity: 16,
-          });
-          autoTest(
-            "AUTO-RX: audible ch C, turbo, FEC 8 + noise 15 dB",
-            true,
-            48000,
-            { channel: 2, speed: "turbo", parity: 8, snrDb: 15 },
-          );
-          autoTest("AUTO-RX: ultrasonic, fast @ 44100 Hz", true, 44100, {
-            profile: "ultrasonic",
-            speed: "fast",
-          });
-          autoTest("AUTO-RX: audible ch A, MAX 3x", true, 48000, {
-            speed: "max",
-          });
-
-          test(
-            "Live byte stream matches payload (clean loopback)",
-            true,
-            () => {
-              const got = [];
-              const { result } = loopback(MSG50, 48000, {
-                onLiveByte: (i, b) => {
-                  got[i] = b;
-                },
-              });
-              const ok =
-                !!result &&
-                result.ok &&
-                got.length === MSG50.length &&
-                MSG50.every((b, i) => got[i] === b);
-              return {
-                pass: ok,
-                detail: ok
-                  ? got.length +
-                    "/" +
-                    MSG50.length +
-                    " raw bytes streamed in order"
-                  : "stream mismatch (" + got.length + " bytes)",
-              };
-            },
-          );
-
-          test(
-            "50-byte frame duration is 10-20 s and matches estimate",
-            true,
-            () => {
-              const est = estimateSeconds(50);
-              const actual =
-                modulate(MSG50, makeParams(48000, "audible")).length / 48000;
-              const pass =
-                actual >= 10 && actual <= 20 && Math.abs(actual - est) < 1;
-              return {
-                pass,
-                detail:
-                  "actual " +
-                  actual.toFixed(2) +
-                  "s, estimate " +
-                  est.toFixed(2) +
-                  "s",
-              };
-            },
-          );
-
-          return T;
-        }
-
         return {
           SPEEDS,
           RS_DATA,
@@ -3497,13 +3076,6 @@ NO FRAME RECEIVED YET</pre
           modulate,
           Demodulator,
           AutoDemodulator,
-          loopback,
-          autoLoopback,
-          resampleLinear,
-          mulberry32,
-          bytesEqual,
-          textBytes,
-          selfTests,
         };
       });
       /* ==== END AIRGAP CORE ==== */
@@ -4224,7 +3796,7 @@ NO FRAME RECEIVED YET</pre
             linkExtra(),
           );
           const sig = AirGap.modulate(payload, p, { amplitude: 1.0 });
-          // frame inspector (diagnostics panel)
+          // frame inspector
           const frame = AirGap.encodeFrame(payload, p.parity);
           const nblocks = Math.ceil((payload.length + 4) / AirGap.RS_DATA);
           $("txDump").textContent =
@@ -4352,6 +3924,8 @@ registerProcessor('airgap-capture', AirgapCapture);`;
             "RS DECODE FAILED — too many symbol errors for FEC to repair",
           CRC_FAIL: "PAYLOAD CRC FAILED — corruption beyond what RS could fix",
           LOST_SIGNAL: "SIGNAL LOST — audio buffer overrun during decode",
+          NO_SYNC:
+            "NO SYNC — preamble heard, but the sync marker was not found; frame missed",
         };
 
         function demodCallbacks() {
@@ -4496,7 +4070,7 @@ registerProcessor('airgap-capture', AirgapCapture);`;
                   "\n" +
                   "ERROR    " +
                   (ERRORS[r.error] || r.error) +
-                  rxFailSignal(r.stats) +
+                  rxFailSignal(r.stats, r.error) +
                   (liveBuf && liveN
                     ? "\nRAW      " +
                       liveN +
@@ -4513,7 +4087,9 @@ registerProcessor('airgap-capture', AirgapCapture);`;
 
         // SIGNAL + HINT lines for the failed-frame inspector dump: symbol
         // confidence separates a weak signal from a clipped one
-        function rxFailSignal(stats) {
+        function rxFailSignal(stats, code) {
+          if (code === "NO_SYNC")
+            return "\nHINT     echo and distance can hide the sync marker — move the devices closer";
           if (!stats || !stats.symbols) return "";
           const lvlDb = 20 * Math.log10(Math.max(stats.rms, 1e-6));
           let out =
@@ -4599,6 +4175,7 @@ registerProcessor('airgap-capture', AirgapCapture);`;
                 echoCancellation: false,
                 noiseSuppression: false,
                 autoGainControl: false,
+                voiceIsolation: false,
               },
             });
           } catch (e) {
@@ -4609,6 +4186,42 @@ registerProcessor('airgap-capture', AirgapCapture);`;
             );
             return;
           }
+          // the constraints are requests only: some browsers keep their voice
+          // processing on, and noise suppression removes steady tones as noise
+          const track = micStream.getAudioTracks()[0];
+          const ms = (track && track.getSettings && track.getSettings()) || {};
+          const flag = (v) => (v === true ? "on" : v === false ? "off" : "?");
+          log(
+            "mic: " +
+              (ms.sampleRate || "?") +
+              " Hz · echo cancel " +
+              flag(ms.echoCancellation) +
+              " · noise suppr " +
+              flag(ms.noiseSuppression) +
+              " · auto gain " +
+              flag(ms.autoGainControl) +
+              " · voice isolation " +
+              flag(ms.voiceIsolation),
+          );
+          if (
+            ms.echoCancellation ||
+            ms.noiseSuppression ||
+            ms.autoGainControl ||
+            ms.voiceIsolation
+          )
+            log(
+              "mic warning: the browser kept voice processing on — it can suppress the tones",
+              "a",
+            );
+          if (ms.sampleRate && ms.sampleRate < 32000)
+            log(
+              "mic warning: input runs at " +
+                ms.sampleRate +
+                " Hz (headset mic?) — tones above " +
+                Math.round(ms.sampleRate / 2000) +
+                " kHz are lost",
+              "a",
+            );
           restartDemod();
           micNode = c.createMediaStreamSource(micStream);
           let usingWorklet = false;
@@ -4800,123 +4413,6 @@ registerProcessor('airgap-capture', AirgapCapture);`;
           g.shadowBlur = 0;
         }
 
-        // ================= DIAGNOSTICS =================
-        const tick = () => new Promise((r) => setTimeout(r, 15));
-
-        async function runLoopback() {
-          $("diagOut").innerHTML = "";
-          $("diagBadge").innerHTML = "";
-          $("diagLoop").disabled = $("diagFull").disabled = true;
-          const fs = (ctx && ctx.sampleRate) || 48000;
-          const base = {
-            profile: profileName,
-            speed: speedName,
-            parity: fecParity,
-            channel: channelIdx,
-          };
-          log(
-            "loopback self-test running (" +
-              AirGap.PROFILES[profileName].label +
-              " · " +
-              AirGap.SPEEDS[speedName].label +
-              ")…",
-          );
-          const msg = AirGap.textBytes("AIRGAP LOOPBACK " + Date.now());
-          const cases = [
-            ["clean @ " + fs + " Hz", Object.assign({}, base)],
-            ["white noise SNR 10 dB", Object.assign({ snrDb: 10 }, base)],
-          ];
-          let allOk = true;
-          for (const [name, opts] of cases) {
-            await tick();
-            const t0 = performance.now();
-            let ok = false,
-              detail = "";
-            try {
-              const { result, seconds } = AirGap.loopback(msg, fs, opts);
-              ok =
-                !!result && result.ok && AirGap.bytesEqual(result.payload, msg);
-              detail = ok
-                ? seconds.toFixed(1) +
-                  "s audio decoded in " +
-                  ((performance.now() - t0) / 1000).toFixed(1) +
-                  "s"
-                : result
-                  ? "error: " + (result.error || "mismatch")
-                  : "no frame detected";
-            } catch (e) {
-              detail = "exception: " + e;
-            }
-            diagLine(ok ? "p" : "f", "Loopback " + name + " — " + detail);
-            allOk = allOk && ok;
-          }
-          $("diagBadge").innerHTML =
-            '<span class="badge ' +
-            (allOk ? 'ok">LOOPBACK PASS' : 'bad">LOOPBACK FAIL') +
-            "</span>";
-          log(
-            "loopback self-test: " + (allOk ? "PASS" : "FAIL"),
-            allOk ? "g" : "r",
-          );
-          $("diagLoop").disabled = $("diagFull").disabled = false;
-        }
-
-        async function runFullSuite() {
-          $("diagOut").innerHTML = "";
-          $("diagBadge").innerHTML = "";
-          $("diagLoop").disabled = $("diagFull").disabled = true;
-          log("full test suite running…");
-          console.log("=== AIRGAP SELF-TEST ===");
-          let hardFails = 0,
-            count = 0;
-          for (const t of AirGap.selfTests()) {
-            await tick();
-            let r;
-            try {
-              r = t.run();
-            } catch (e) {
-              r = { pass: false, detail: "EXCEPTION: " + e };
-            }
-            const cls = r.pass ? "p" : t.hard ? "f" : "s";
-            diagLine(cls, t.name + " — " + r.detail);
-            console.log(
-              (r.pass ? "PASS" : t.hard ? "FAIL" : "soft-fail") +
-                "  " +
-                t.name +
-                " — " +
-                r.detail,
-            );
-            if (!r.pass && t.hard) hardFails++;
-            count++;
-          }
-          const ok = hardFails === 0;
-          $("diagBadge").innerHTML =
-            '<span class="badge ' +
-            (ok
-              ? 'ok">' + count + " TESTS PASS"
-              : 'bad">' + hardFails + " FAILURES") +
-            "</span>";
-          console.log(
-            ok ? "ALL HARD TESTS PASSED" : hardFails + " HARD FAILURES",
-          );
-          log(
-            "test suite: " +
-              (ok
-                ? "all " + count + " tests passed"
-                : hardFails + " hard failures"),
-            ok ? "g" : "r",
-          );
-          $("diagLoop").disabled = $("diagFull").disabled = false;
-        }
-        function diagLine(cls, text) {
-          const d = document.createElement("div");
-          d.className = cls;
-          d.textContent = text;
-          $("diagOut").appendChild(d);
-        }
-        on("diagLoop", "click", runLoopback);
-        on("diagFull", "click", runFullSuite);
-
         // ---- copy / save ----
         on("rxCopy", "click", async () => {
           if (lastResultText === null) return;
@@ -4976,10 +4472,6 @@ registerProcessor('airgap-capture', AirgapCapture);`;
           }
         })();
         refreshTxInfo();
-        if (new URLSearchParams(location.search).has("selftest")) {
-          log("?selftest — diagnostic boot", "a");
-          setTimeout(runFullSuite, 300);
-        }
       })();
     </script>
   </body>
