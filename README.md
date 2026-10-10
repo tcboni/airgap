@@ -22,17 +22,17 @@ Send short text messages between nearby devices using sound — no network, no p
 - **Bands** — an audible profile (~1.5–5 kHz, three channels A/B/C) and
   an ultrasonic profile (~16–19 kHz). Four speed presets trade reliability
   for throughput (~5.5 to ~16.7 B/s raw).
-- **Receiver** — FFT-based demodulator with early/late gate clock
-  tracking, phase refinement at lock, and header decode retries; the FEC
-  setting travels in the header, so only the sender needs to choose it.
+- **Receiver** — FFT-based demodulator. The preamble lock correlates the
+  two marker tones with the preamble's alternating rhythm, and the sync
+  test compares each tone with its own level, so room echo and an uneven
+  speaker/mic response do not break detection. Early/late gate clock
+  tracking, echo subtraction before each tone decision, and a header
+  search over several symbol grids (RS + CRC-16 pick the right one). The
+  FEC setting travels in the header, so only the sender needs to choose it.
 
-## Diagnostics
+## Inspector
 
-- The DIAGNOSTICS panel runs an in-memory loopback (modulate → demodulate)
-  plus the full suite: CRC vectors, RS error injection, FFT sanity, and
-  round trips with noise and clock drift.
-- Open the page with `?selftest` appended to the URL to run everything at
-  boot.
-- The DSP core is pure JavaScript with no browser dependencies — the
-  `AIRGAP CORE` section of `index.html` can be extracted and run under
-  Node for testing.
+- The INSPECTOR panel shows the last frame sent and the last frame
+  received: link settings, tone frequencies, header fields, Reed-Solomon
+  corrections, symbol confidence, CRC check and a payload hex dump. A
+  failed frame shows the stage where it failed, with a hint.
